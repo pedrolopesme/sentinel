@@ -1,0 +1,9 @@
+version: '3.6'
+services:
+  app:
+    container_name: "sentinel"
+    image: "sentinel:latest"
+    volumes:
+      - "./:/go/src/github.com/pedrolopesme/sentinel"
+    ports:
+      - "3030:3030"
