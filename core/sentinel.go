@@ -23,9 +23,9 @@ type Sentinel interface {
 // TODO decouple sentinel logic from http consume logic.
 // TODO Alphavantage deserves its own client.
 type StockSentinel struct {
-	id              string
-	alphaVantageKey string
-	schedule        *Schedule
+	id       string
+	config   *SentinelConfig
+	schedule *Schedule
 }
 
 // GetId returns a unique identifier to the sentinel
@@ -37,12 +37,12 @@ func (s *StockSentinel) GetId() string {
 // GetId returns a unique identifier to the sentinel
 // TODO add tests
 // TODO add log
-// TODO extract all AlphaVantage retrieval to its own client
+// TODO extract all AlphaVantageKey retrieval to its own client
 func (s *StockSentinel) Run() (string, error) {
 	var executionId = uuid.Must(uuid.NewV4()).String()
 	fmt.Println("Running StockSentinel ", s.GetId(), " - execution ", executionId)
 
-	url := fmt.Sprintf("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=%v&interval=%v&outputsize=full&apikey=%v", s.schedule.Stock, s.schedule.TimeFrame, s.alphaVantageKey)
+	url := fmt.Sprintf("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=%v&interval=%v&outputsize=full&apikey=%v", s.schedule.Stock, s.schedule.TimeFrame, s.config.AlphaVantageKey)
 	client := http.Client{
 		Timeout: time.Second * 10, // Maximum of 2 secs
 	}
@@ -74,10 +74,10 @@ func (s *StockSentinel) Kill() error {
 
 // NewSentinel
 // TODO add tests
-func NewStockSentinel(alphaVantage string, schedule *Schedule) (sentinel *StockSentinel) {
+func NewStockSentinel(config *SentinelConfig, schedule *Schedule) (sentinel *StockSentinel) {
 	return &StockSentinel{
-		id:              uuid.Must(uuid.NewV4()).String(),
-		schedule:        schedule,
-		alphaVantageKey: alphaVantage,
+		id:       uuid.Must(uuid.NewV4()).String(),
+		schedule: schedule,
+		config:   config,
 	}
 }
