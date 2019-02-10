@@ -41,3 +41,4 @@ _vendor*
 
 # Project specifics
 sentinel
+*.log

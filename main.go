@@ -21,10 +21,9 @@ func init() {
 		os.Exit(1)
 	}
 
-	// Initializing logger
-	logger, err = zap.NewProduction()
+	logger, err = initializeLogger(sentinelConfig)
 	if err != nil {
-		fmt.Println("It was impossible to load logger. Killing sentinel.")
+		fmt.Printf("It was impossible to load logger. Killing sentinel. Error: %v", err.Error())
 		os.Exit(1)
 	}
 }
@@ -37,6 +36,14 @@ func final() {
 			os.Exit(1)
 		}
 	}()
+}
+
+func initializeLogger(config *core.SentinelConfig) (*zap.Logger, error) {
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{
+		fmt.Sprintf("%v/sentinels.log", config.LogsPath),
+	}
+	return cfg.Build()
 }
 
 func main() {
