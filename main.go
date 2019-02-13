@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/pedrolopesme/sentinel/client"
 	"github.com/pedrolopesme/sentinel/core"
 	"go.uber.org/zap"
 	"os"
@@ -51,14 +52,17 @@ func main() {
 	printLogo()
 
 	// Hardcoding a stock to test sentinel
-	// TODO: replace this with something more flexible.
+	// TODO: replace this hardcoded schedule with something more flexible.
 	var (
 		schedule = core.NewSchedule("PETR3.SA", "1min")
 		sentinel = core.NewStockSentinel(sentinelConfig, schedule)
 	)
 
+	// Creating AlphaVantage client instance
+	alphaVantage := client.NewAlphaVantage(sentinelConfig.AlphaVantageKey)
+
 	// Running sentinel
-	executionId, err := sentinel.Run()
+	executionId, err := sentinel.Run(alphaVantage)
 	if err != nil {
 		logger.Error("Fail to run sentinel",
 			zap.String("sentinelId", sentinel.GetId()),

@@ -2,10 +2,8 @@ package core
 
 import (
 	"fmt"
+	"github.com/pedrolopesme/sentinel/client"
 	"github.com/satori/go.uuid"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 type Sentinel interface {
@@ -13,7 +11,7 @@ type Sentinel interface {
 	GetId() string
 
 	// Run puts sentinel to run and returns its execution Id and an error
-	Run() (string, error)
+	Run(stockProvider client.StockProvider) (string, error)
 
 	// Kill stops a Sentinel
 	Kill() error
@@ -38,31 +36,15 @@ func (s *StockSentinel) GetId() string {
 // TODO add tests
 // TODO add log
 // TODO extract all AlphaVantageKey retrieval to its own client
-func (s *StockSentinel) Run() (string, error) {
+func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
 	var executionId = uuid.Must(uuid.NewV4()).String()
 	fmt.Println("Running StockSentinel ", s.GetId(), " - execution ", executionId)
 
-	url := fmt.Sprintf("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=%v&interval=%v&outputsize=full&apikey=%v", s.schedule.Stock, s.schedule.TimeFrame, s.config.AlphaVantageKey)
-	client := http.Client{
-		Timeout: time.Second * 10, // Maximum of 2 secs
-	}
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	_, err := stockProvider.GetStocks(s.schedule.Stock, s.schedule.TimeFrame)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Cant get stocks due to", err.Error())
 	}
 
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Print(string(body))
 	return executionId, nil
 }
 
