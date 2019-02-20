@@ -40,9 +40,14 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 	var executionId = uuid.Must(uuid.NewV4()).String()
 	fmt.Println("Running StockSentinel ", s.GetId(), " - execution ", executionId)
 
-	_, err := stockProvider.GetStocks(s.schedule.Stock, s.schedule.TimeFrame)
+	stocks, err := stockProvider.GetStocks(s.schedule.Stock, s.schedule.TimeFrame)
 	if err != nil {
 		fmt.Println("Cant get stocks due to", err.Error())
+	}
+
+	// TOdo persist it somewhere
+	for k, y := range stocks {
+		fmt.Println(k, ">>>", y.Price.High)
 	}
 
 	return executionId, nil

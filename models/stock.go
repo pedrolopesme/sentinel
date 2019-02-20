@@ -14,5 +14,5 @@ type StockPrice struct {
 // StockTier joins price variation with other important information
 type StockTier struct {
 	Volume int64
-	*StockPrice
+	Price  *StockPrice
 }

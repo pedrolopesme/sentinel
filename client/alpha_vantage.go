@@ -1,16 +1,20 @@
 package client
 
 import (
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"github.com/pedrolopesme/sentinel/models"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 const (
-	URL               = "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=%v&interval=%v&outputsize=full&apikey=%v"
+	URL               = "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=%v&interval=%v&outputsize=full&datatype=csv&apikey=%v"
 	HTTP_TIMEOUT_SECS = 10
+	TIME_LAYOUT       = "2006-01-02 15:04:05"
 )
 
 // AlphaVantage is a client to https://www.alphavantage.co/
@@ -33,9 +37,7 @@ func (a *AlphaVantage) GetStocks(stock string, timeFrame string) (map[time.Time]
 	if err != nil {
 		return nil, ErrCantGetStockPricesFromAlphaVantage
 	}
-
-	fmt.Print(string(body))
-	return nil, nil
+	return parseStocksJson(body)
 }
 
 func buildURL(stock string, timeFrame string, key string) string {
@@ -67,4 +69,90 @@ func makeHttpCall(url string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+// parseStocksJson knows how to transform an AlphaVantage response to
+// a list of stocks
+// TODO add tests
+// TODO add logs
+// TODO add util funcs for time, number manipulation
+func parseStocksJson(body []byte) (map[time.Time]models.StockTier, error) {
+	const (
+		TIME_COLUMN = iota
+		OPEN_COLUMN
+		HIGH_COLUMN
+		LOW_COLUMN
+		CLOSE_COLUMN
+		VOLUME_COLUMN
+	)
+
+	var bytesReader = bytes.NewReader(body)
+	var csvReader = csv.NewReader(bytesReader)
+	data, err := csvReader.ReadAll()
+	if err != nil {
+		// TODO log real error cause
+		return nil, ErrCantParseStockPricesFromAlphaVantage
+	}
+
+	var stockTiers = make(map[time.Time]models.StockTier)
+	for line, entry := range data {
+		if line == 0 {
+			continue // skipping header
+		}
+
+		stockTime, err := time.Parse(TIME_LAYOUT, entry[TIME_COLUMN])
+		if err != nil {
+			// TODO log real error cause
+			fmt.Println(err.Error())
+			return nil, ErrCantParseStockPricesFromAlphaVantage
+		}
+
+		stockVolume, err := strconv.ParseInt(entry[VOLUME_COLUMN], 10, 64)
+		if err != nil {
+			// TODO log real error cause
+			fmt.Println(err.Error())
+			return nil, ErrCantParseStockPricesFromAlphaVantage
+		}
+
+		stockOpen, err := strconv.ParseFloat(entry[OPEN_COLUMN], 64)
+		if err != nil {
+			// TODO log real error cause
+			fmt.Println(err.Error())
+			return nil, ErrCantParseStockPricesFromAlphaVantage
+		}
+
+		stockHigh, err := strconv.ParseFloat(entry[HIGH_COLUMN], 64)
+		if err != nil {
+			// TODO log real error cause
+			fmt.Println(err.Error())
+			return nil, ErrCantParseStockPricesFromAlphaVantage
+		}
+
+		stockLow, err := strconv.ParseFloat(entry[LOW_COLUMN], 64)
+		if err != nil {
+			// TODO log real error cause
+			fmt.Println(err.Error())
+			return nil, ErrCantParseStockPricesFromAlphaVantage
+		}
+
+		stockClose, err := strconv.ParseFloat(entry[CLOSE_COLUMN], 64)
+		if err != nil {
+			// TODO log real error cause
+			fmt.Println(err.Error())
+			return nil, ErrCantParseStockPricesFromAlphaVantage
+		}
+
+		tier := models.StockTier{
+			Volume: stockVolume,
+			Price: &models.StockPrice{
+				Open:  models.Money(stockOpen),
+				Close: models.Money(stockClose),
+				Low:   models.Money(stockLow),
+				High:  models.Money(stockHigh),
+			},
+		}
+		stockTiers[stockTime] = tier
+	}
+
+	return stockTiers, nil
 }
