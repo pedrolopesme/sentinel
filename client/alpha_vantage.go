@@ -37,7 +37,7 @@ func (a *AlphaVantage) GetStocks(stock string, timeFrame string) (map[time.Time]
 	if err != nil {
 		return nil, ErrCantGetStockPricesFromAlphaVantage
 	}
-	return parseStocksJson(body)
+	return parseStocksCSV(body)
 }
 
 func buildURL(stock string, timeFrame string, key string) string {
@@ -71,12 +71,12 @@ func makeHttpCall(url string) ([]byte, error) {
 	return body, nil
 }
 
-// parseStocksJson knows how to transform an AlphaVantage response to
+// parseStocksCSV knows how to transform an AlphaVantage response to
 // a list of stocks
 // TODO add tests
 // TODO add logs
 // TODO add util funcs for time, number manipulation
-func parseStocksJson(body []byte) (map[time.Time]models.StockTier, error) {
+func parseStocksCSV(body []byte) (map[time.Time]models.StockTier, error) {
 	const (
 		TIME_COLUMN = iota
 		OPEN_COLUMN
