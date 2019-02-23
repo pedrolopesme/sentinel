@@ -63,7 +63,7 @@ docker-shell:
 	@echo "=============Accessing Container Shell============="
 	docker exec -t sentinel bash
 
-docker-clean: docker-down
+docker-clean: docker-stop
 	@echo "=============Cleaning up============="
 	rm -f sentinel
 	docker system prune -f
