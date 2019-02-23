@@ -29,4 +29,12 @@ docker-logs:     make a tail -f on Sentinel running containers
 docker-shell:    login on Sentinel running container
 docker-clean:    terminate Sentinel container and remove all data related to them
 ```
- 
+
+#### TO DO
+
+Roadmap to V0.1
+
+[] use a message broker (NATS ?) as the default source of scheduling
+[] use a message broker (NATS ?) to send all stock quotations collected on each run 
+[] implement all TODOs  
+[] create kubernetes deployment yml
