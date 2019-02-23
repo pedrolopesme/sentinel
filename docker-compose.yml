@@ -2,6 +2,8 @@ version: '3.6'
 services:
   app:
     container_name: "sentinel"
+    env_file:
+      - config/sentinel.env
     image: "sentinel:latest"
     volumes:
       - "./:/go/src/github.com/pedrolopesme/sentinel"
