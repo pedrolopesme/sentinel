@@ -4,6 +4,11 @@ import (
 	"fmt"
 	"github.com/pedrolopesme/sentinel/client"
 	"github.com/satori/go.uuid"
+	"os"
+)
+
+const (
+	NATS_STOCKS_SUBJECT = "stocks"
 )
 
 type Sentinel interface {
@@ -17,17 +22,14 @@ type Sentinel interface {
 	Kill() error
 }
 
-// TODO extract alphaVantageKey from here.
-// TODO decouple sentinel logic from http consume logic.
-// TODO Alphavantage deserves its own client.
 type StockSentinel struct {
-	id       string
-	config   *SentinelConfig
-	schedule *Schedule
+	id         string
+	config     *SentinelConfig
+	schedule   *Schedule
+	stocksNats client.NATSServer
 }
 
 // GetId returns a unique identifier to the sentinel
-// TODO add tests
 func (s *StockSentinel) GetId() string {
 	return s.id
 }
@@ -35,7 +37,6 @@ func (s *StockSentinel) GetId() string {
 // GetId returns a unique identifier to the sentinel
 // TODO add tests
 // TODO add log
-// TODO extract all AlphaVantageKey retrieval to its own client
 func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
 	var executionId = uuid.Must(uuid.NewV4()).String()
 	fmt.Println("Running StockSentinel ", s.GetId(), " - execution ", executionId)
@@ -45,9 +46,17 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 		fmt.Println("Cant get stocks due to", err.Error())
 	}
 
-	// TOdo persist it somewhere
+	// TODO extract it somewhere else
+	// TODO add tests
+	// TODO what if publish fails? What about a retry logic?
+	// TODO format message properly
+	var stockNATSClient = s.stocksNats.GetConnection()
 	for k, y := range stocks {
-		fmt.Println(k, ">>>", y.Price.High)
+		stock := fmt.Sprint(k, ">>>", y.Price.High)
+		if err = stockNATSClient.Publish(NATS_STOCKS_SUBJECT, []byte(stock)); err != nil {
+			fmt.Println("Cant public stocks to queue due to", err.Error())
+			os.Exit(1)
+		}
 	}
 
 	return executionId, nil
@@ -61,10 +70,16 @@ func (s *StockSentinel) Kill() error {
 
 // NewSentinel
 // TODO add tests
-func NewStockSentinel(config *SentinelConfig, schedule *Schedule) (sentinel *StockSentinel) {
-	return &StockSentinel{
-		id:       uuid.Must(uuid.NewV4()).String(),
-		schedule: schedule,
-		config:   config,
+func NewStockSentinel(config *SentinelConfig, schedule *Schedule) (sentinel *StockSentinel, err error) {
+	stockNATS, err := client.NewNATSServer(config.NATSStocksURI)
+	if err != nil {
+		return nil, err
 	}
+
+	return &StockSentinel{
+		id:         uuid.Must(uuid.NewV4()).String(),
+		schedule:   schedule,
+		config:     config,
+		stocksNats: stockNATS,
+	}, nil
 }

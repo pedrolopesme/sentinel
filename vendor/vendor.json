@@ -3,6 +3,36 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "kBHVjB4SJmsRHWkZQNt96W0iXF0=",
+			"path": "github.com/nats-io/go-nats",
+			"revision": "f3379e01130f595688283acd70cdb1fff65d9a4d",
+			"revisionTime": "2019-02-22T18:25:57Z"
+		},
+		{
+			"checksumSHA1": "C/TsNyFOKX2bTW3U9O3m5mQhJo8=",
+			"path": "github.com/nats-io/go-nats/encoders/builtin",
+			"revision": "f3379e01130f595688283acd70cdb1fff65d9a4d",
+			"revisionTime": "2019-02-22T18:25:57Z"
+		},
+		{
+			"checksumSHA1": "mBZQa+wv/u+0qA1ceh6MrWBEgxs=",
+			"path": "github.com/nats-io/go-nats/util",
+			"revision": "f3379e01130f595688283acd70cdb1fff65d9a4d",
+			"revisionTime": "2019-02-22T18:25:57Z"
+		},
+		{
+			"checksumSHA1": "6xwMpun2lAxptGPocW+HKJg1Xoc=",
+			"path": "github.com/nats-io/nkeys",
+			"revision": "1546a3320a8f195a5b5c84aef8309377c2e411d5",
+			"revisionTime": "2018-12-05T15:18:57Z"
+		},
+		{
+			"checksumSHA1": "1nYATxVIxGfj9MmbKM66PrOATtc=",
+			"path": "github.com/nats-io/nuid",
+			"revision": "3024a71c3cbe30667286099921591e6fcc328230",
+			"revisionTime": "2018-07-12T04:49:59Z"
+		},
+		{
 			"checksumSHA1": "ljd3FhYRJ91cLZz3wsH9BQQ2JbA=",
 			"path": "github.com/pkg/errors",
 			"revision": "816c9085562cd7ee03e7f8188a1cfd942858cded",
@@ -61,6 +91,18 @@
 			"path": "go.uber.org/zap/zapcore",
 			"revision": "82e3b47c1fe49387143b1a051a9ab6f34a08678d",
 			"revisionTime": "2019-01-22T18:45:50Z"
+		},
+		{
+			"checksumSHA1": "2LpxYGSf068307b7bhAuVjvzLLc=",
+			"path": "golang.org/x/crypto/ed25519",
+			"revision": "ffb98f73852f696ea2bb21a617a5c4b3e067a439",
+			"revisionTime": "2018-06-14T15:19:00Z"
+		},
+		{
+			"checksumSHA1": "0JTAFXPkankmWcZGQJGScLDiaN8=",
+			"path": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"revision": "ffb98f73852f696ea2bb21a617a5c4b3e067a439",
+			"revisionTime": "2018-06-14T15:19:00Z"
 		}
 	],
 	"rootPath": "github.com/pedrolopesme/sentinel"

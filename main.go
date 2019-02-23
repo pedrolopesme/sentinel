@@ -31,12 +31,10 @@ func init() {
 
 // final runs when the Sentinel terminates
 func final() {
-	defer func() {
-		if err := logger.Sync(); err != nil {
-			fmt.Println("It was impossible to flush the logger")
-			os.Exit(1)
-		}
-	}()
+	if err := logger.Sync(); err != nil {
+		fmt.Println("It was impossible to flush the logger")
+		os.Exit(1)
+	}
 }
 
 func initializeLogger(config *core.SentinelConfig) (*zap.Logger, error) {
@@ -53,10 +51,16 @@ func main() {
 
 	// Hardcoding a stock to test sentinel
 	// TODO: replace this hardcoded schedule with something more flexible.
-	var (
-		schedule = core.NewSchedule("PETR3.SA", "1min")
-		sentinel = core.NewStockSentinel(sentinelConfig, schedule)
-	)
+	var schedule = core.NewSchedule("PETR3.SA", "1min")
+
+	var sentinel, err = core.NewStockSentinel(sentinelConfig, schedule)
+	if err != nil {
+		logger.Error("Fail to instantiate sentinel",
+			zap.String("sentinelId", sentinel.GetId()),
+			zap.String("method", "main"),
+			zap.String("error", err.Error()))
+		os.Exit(1)
+	}
 
 	// Creating AlphaVantage client instance
 	alphaVantage := client.NewAlphaVantage(sentinelConfig.AlphaVantageKey)

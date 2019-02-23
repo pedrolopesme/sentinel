@@ -35,6 +35,6 @@ docker-clean:    terminate Sentinel container and remove all data related to the
 Roadmap to V0.1
 
 [] use a message broker (NATS ?) as the default source of scheduling
-[] use a message broker (NATS ?) to send all stock quotations collected on each run 
+[x] use a message broker (NATS ?) to send all stock quotations collected on each run 
 [] implement all TODOs  
 [] create kubernetes deployment yml
