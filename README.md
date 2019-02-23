@@ -24,10 +24,9 @@ clean:           clean all Sentinel binaries
 fmt:             run go fmt on all go files
 docker-build:    build Sentinel docker image
 docker-run:      build Sentinel docker image and execute docker compose up
-docker-stop:     execute docker compose down
+docker-stop:     execute a docker compose down
 docker-logs:     make a tail -f on Sentinel running containers
 docker-shell:    login on Sentinel running container
-docker-clean:    terminal Sentinel container and remove all data related to them
-
+docker-clean:    terminate Sentinel container and remove all data related to them
 ```
  

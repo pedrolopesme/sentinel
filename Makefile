@@ -16,10 +16,10 @@ help:
 	@echo "fmt:             run go fmt on all go files"
 	@echo "docker-build:    build Sentinel docker image"
 	@echo "docker-run:      build Sentinel docker image and execute docker compose up"
-	@echo "docker-stop:     execute docker compose down"
+	@echo "docker-stop:     execute a docker compose down"
 	@echo "docker-logs:     make a tail -f on Sentinel running containers"
 	@echo "docker-shell:    login on Sentinel running container"
-	@echo "docker-clean:    terminal Sentinel container and remove all data related to them"
+	@echo "docker-clean:    terminate Sentinel containers and remove all data related to them"
 
 build:
 	@echo "=============Building Sentinel============="
