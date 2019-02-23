@@ -40,4 +40,6 @@ _vendor*
 .gobuild*
 
 # Project specifics
-citta-server
+sentinel
+logs/*.log
+config/*.env
