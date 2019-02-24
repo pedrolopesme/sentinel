@@ -34,7 +34,7 @@ docker-prune:    terminate Sentinel container and prune volume and system
 
 Roadmap to V0.1
 
-- [] use a message broker (NATS ?) as the default source of scheduling
-- [] implement all TODOs  
-- [] create kubernetes deployment yml
+- [ ] use a message broker (NATS ?) as the default source of scheduling
+- [ ] implement all TODOs  
+- [ ] create kubernetes deployment yml
 - [x] use a message broker (NATS ?) to send all stock quotations collected on each run 
