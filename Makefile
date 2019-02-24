@@ -19,7 +19,7 @@ help:
 	@echo "docker-stop:     execute a docker compose down"
 	@echo "docker-logs:     make a tail -f on Sentinel running containers"
 	@echo "docker-shell:    login on Sentinel running container"
-	@echo "docker-clean:    terminate Sentinel containers and remove all data related to them"
+	@echo "docker-prune:    terminate Sentinel containers and remove all data related to them"
 
 build:
 	@echo "=============Building Sentinel============="
