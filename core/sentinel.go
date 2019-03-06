@@ -45,15 +45,25 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 	if err != nil {
 		fmt.Println("Cant get stocks due to", err.Error())
 	}
+	fmt.Printf("Found %v stocks. Publishing those to stocks queue \n", len(stocks))
+
+	fmt.Println("Connecting to Stocks Queue")
+	var stockNATSClient = s.stocksNats.GetConnection()
+	fmt.Println("Connected to Stocks Queue")
+
+	defer func() {
+		fmt.Println("Disconnecting from Stocks Queue")
+		stockNATSClient.Close()
+		fmt.Println("Disconnected from Stocks Queue")
+	}()
 
 	// TODO extract it somewhere else
 	// TODO add tests
 	// TODO what if publish fails? What about a retry logic?
 	// TODO format message properly
-	var stockNATSClient = s.stocksNats.GetConnection()
-	defer stockNATSClient.Close()
 	for k, y := range stocks {
 		stock := fmt.Sprint(k, ">>>", y.Price.High)
+		fmt.Printf("Publishing stock %v\n", k)
 		if err = stockNATSClient.Publish(NATS_STOCKS_SUBJECT, []byte(stock)); err != nil {
 			fmt.Println("Cant public stocks to queue due to", err.Error())
 			os.Exit(1)
