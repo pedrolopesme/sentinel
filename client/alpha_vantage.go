@@ -48,6 +48,7 @@ func buildURL(stock string, timeFrame string, key string) string {
 // to retrieve stocks price
 // TODO add log  with request execution time
 // TODO check http status code
+// TODO extract to a http lib?
 func makeHttpCall(url string) ([]byte, error) {
 	client := http.Client{
 		Timeout: time.Second * HTTP_TIMEOUT_SECS,

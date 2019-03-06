@@ -1,4 +1,4 @@
-// Copyright 2012-2019 The NATS Authors
+// Copyright 2012-2018 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +27,6 @@ import (
 	"math/rand"
 	"net"
 	"net/url"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -37,13 +35,12 @@ import (
 	"time"
 
 	"github.com/nats-io/go-nats/util"
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 )
 
 // Default Constants
 const (
-	Version                 = "1.7.2"
+	Version                 = "1.6.0"
 	DefaultURL              = "nats://localhost:4222"
 	DefaultPort             = 4222
 	DefaultMaxReconnect     = 60
@@ -58,16 +55,14 @@ const (
 	LangString              = "go"
 )
 
-const (
-	// STALE_CONNECTION is for detection and proper handling of stale connections.
-	STALE_CONNECTION = "stale connection"
+// STALE_CONNECTION is for detection and proper handling of stale connections.
+const STALE_CONNECTION = "stale connection"
 
-	// PERMISSIONS_ERR is for when nats server subject authorization has failed.
-	PERMISSIONS_ERR = "permissions violation"
+// PERMISSIONS_ERR is for when nats server subject authorization has failed.
+const PERMISSIONS_ERR = "permissions violation"
 
-	// AUTHORIZATION_ERR is for when nats server user authorization has failed.
-	AUTHORIZATION_ERR = "authorization violation"
-)
+// AUTHORIZATION_ERR is for when nats server user authorization has failed.
+const AUTHORIZATION_ERR = "authorization violation"
 
 // Errors
 var (
@@ -97,16 +92,8 @@ var (
 	ErrInvalidMsg             = errors.New("nats: invalid message or message nil")
 	ErrInvalidArg             = errors.New("nats: invalid argument")
 	ErrInvalidContext         = errors.New("nats: invalid context")
-	ErrNoDeadlineContext      = errors.New("nats: context requires a deadline")
 	ErrNoEchoNotSupported     = errors.New("nats: no echo option not supported by this server")
-	ErrClientIDNotSupported   = errors.New("nats: client ID not supported by this server")
-	ErrUserButNoSigCB         = errors.New("nats: user callback defined without a signature handler")
-	ErrNkeyButNoSigCB         = errors.New("nats: nkey defined without a signature handler")
-	ErrNoUserCB               = errors.New("nats: user callback not defined")
-	ErrNkeyAndUser            = errors.New("nats: user callback and nkey defined")
-	ErrNkeysNotSupported      = errors.New("nats: nkeys not supported by the server")
 	ErrStaleConnection        = errors.New("nats: " + STALE_CONNECTION)
-	ErrTokenAlreadySet        = errors.New("nats: token and token handler both set")
 )
 
 // GetDefaultOptions returns default configuration options for the client.
@@ -149,18 +136,6 @@ type ConnHandler func(*Conn)
 // ErrHandler is used to process asynchronous errors encountered
 // while processing inbound messages.
 type ErrHandler func(*Conn, *Subscription, error)
-
-// UserJWTHandler is used to fetch and return the account signed
-// JWT for this user.
-type UserJWTHandler func() (string, error)
-
-// SignatureHandler is used to sign a nonce from the server while
-// authenticating with nkeys. The user should sign the nonce and
-// return the base64 encoded signature.
-type SignatureHandler func([]byte) ([]byte, error)
-
-// AuthTokenHandler is used to generate a new token.
-type AuthTokenHandler func() string
 
 // asyncCB is used to preserve order for async callbacks.
 type asyncCB struct {
@@ -244,8 +219,8 @@ type Options struct {
 	// DrainTimeout sets the timeout for a Drain Operation to complete.
 	DrainTimeout time.Duration
 
-	// FlusherTimeout is the maximum time to wait for write operations
-	// to the underlying connection to complete (including the flusher loop).
+	// FlusherTimeout is the maximum time to wait for the flusher loop
+	// to be able to finish writing to the underlying connection.
 	FlusherTimeout time.Duration
 
 	// PingInterval is the period at which the client will be sending ping
@@ -285,18 +260,6 @@ type Options struct {
 	// dictated by PendingLimits()
 	SubChanLen int
 
-	// UserJWT sets the callback handler that will fetch a user's JWT.
-	UserJWT UserJWTHandler
-
-	// Nkey sets the public nkey that will be used to authenticate
-	// when connecting to the server. UserJWT and Nkey are mutually exclusive
-	// and if defined, UserJWT will take precedence.
-	Nkey string
-
-	// SignatureCB designates the function used to sign the nonce
-	// presented from the server.
-	SignatureCB SignatureHandler
-
 	// User sets the username to be used when connecting to the server.
 	User string
 
@@ -305,9 +268,6 @@ type Options struct {
 
 	// Token sets the token to be used when connecting to a server.
 	Token string
-
-	// TokenHandler designates the function used to generate the token to be used when connecting to a server.
-	TokenHandler AuthTokenHandler
 
 	// Dialer allows a custom net.Dialer when forming connections.
 	// DEPRECATED: should use CustomDialer instead.
@@ -330,7 +290,7 @@ const (
 	defaultBufSize = 32768
 
 	// The buffered size of the flush "kick" channel
-	flushChanSize = 1
+	flushChanSize = 1024
 
 	// Default server pool size
 	srvPoolSize = 4
@@ -350,15 +310,15 @@ type Conn struct {
 	// atomic.* functions crash on 32bit machines if operand is not aligned
 	// at 64bit. See https://github.com/golang/go/issues/599
 	Statistics
-	mu sync.RWMutex
+	mu sync.Mutex
 	// Opts holds the configuration of the Conn.
 	// Modifying the configuration of a running Conn is a race.
 	Opts    Options
 	wg      sync.WaitGroup
-	srvPool []*srv
-	current *srv
-	urls    map[string]struct{} // Keep track of all known URLs (used by processInfo)
+	url     *url.URL
 	conn    net.Conn
+	srvPool []*srv
+	urls    map[string]struct{} // Keep track of all known URLs (used by processInfo)
 	bw      *bufio.Writer
 	pending *bytes.Buffer
 	fch     chan struct{}
@@ -381,7 +341,6 @@ type Conn struct {
 	respMux   *Subscription        // A single response subscription
 	respMap   map[string]chan *Msg // Request map for the response msg channels
 	respSetup sync.Once            // Ensures response subscription occurs once
-	respRand  *rand.Rand           // Used for generating suffix.
 }
 
 // A Subscription represents interest in a given subject.
@@ -457,7 +416,6 @@ type srv struct {
 	reconnects  int
 	lastAttempt time.Time
 	isImplicit  bool
-	tlsName     string
 }
 
 type serverInfo struct {
@@ -470,8 +428,6 @@ type serverInfo struct {
 	MaxPayload   int64    `json:"max_payload"`
 	ConnectURLs  []string `json:"connect_urls,omitempty"`
 	Proto        int      `json:"proto,omitempty"`
-	CID          uint64   `json:"client_id,omitempty"`
-	Nonce        string   `json:"nonce,omitempty"`
 }
 
 const (
@@ -484,20 +440,17 @@ const (
 )
 
 type connectInfo struct {
-	Verbose   bool   `json:"verbose"`
-	Pedantic  bool   `json:"pedantic"`
-	UserJWT   string `json:"jwt,omitempty"`
-	Nkey      string `json:"nkey,omitempty"`
-	Signature string `json:"sig,omitempty"`
-	User      string `json:"user,omitempty"`
-	Pass      string `json:"pass,omitempty"`
-	Token     string `json:"auth_token,omitempty"`
-	TLS       bool   `json:"tls_required"`
-	Name      string `json:"name"`
-	Lang      string `json:"lang"`
-	Version   string `json:"version"`
-	Protocol  int    `json:"protocol"`
-	Echo      bool   `json:"echo"`
+	Verbose  bool   `json:"verbose"`
+	Pedantic bool   `json:"pedantic"`
+	User     string `json:"user,omitempty"`
+	Pass     string `json:"pass,omitempty"`
+	Token    string `json:"auth_token,omitempty"`
+	TLS      bool   `json:"tls_required"`
+	Name     string `json:"name"`
+	Lang     string `json:"lang"`
+	Version  string `json:"version"`
+	Protocol int    `json:"protocol"`
+	Echo     bool   `json:"echo"`
 }
 
 // MsgHandler is a callback function that processes messages delivered to
@@ -533,11 +486,11 @@ func Name(name string) Option {
 
 // Secure is an Option to enable TLS secure connections that skip server verification by default.
 // Pass a TLS Configuration for proper TLS.
-// NOTE: This should NOT be used in a production setting.
 func Secure(tls ...*tls.Config) Option {
 	return func(o *Options) error {
 		o.Secure = true
 		// Use of variadic just simplifies testing scenarios. We only take the first one.
+		// fixme(DLC) - Could panic if more than one. Could also do TLS option.
 		if len(tls) > 1 {
 			return ErrMultipleTLSConfigs
 		}
@@ -548,8 +501,8 @@ func Secure(tls ...*tls.Config) Option {
 	}
 }
 
-// RootCAs is a helper option to provide the RootCAs pool from a list of filenames.
-// If Secure is not already set this will set it as well.
+// RootCAs is a helper option to provide the RootCAs pool from a list of filenames. If Secure is
+// not already set this will set it as well.
 func RootCAs(file ...string) Option {
 	return func(o *Options) error {
 		pool := x509.NewCertPool()
@@ -572,8 +525,8 @@ func RootCAs(file ...string) Option {
 	}
 }
 
-// ClientCert is a helper option to provide the client certificate from a file.
-// If Secure is not already set this will set it as well.
+// ClientCert is a helper option to provide the client certificate from a file. If Secure is
+// not already set this will set it as well
 func ClientCert(certFile, keyFile string) Option {
 	return func(o *Options) error {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -634,7 +587,7 @@ func MaxReconnects(max int) Option {
 	}
 }
 
-// PingInterval is an Option to set the period for client ping commands.
+// PingInterval is an Option to set the period for client ping commands
 func PingInterval(t time.Duration) Option {
 	return func(o *Options) error {
 		o.PingInterval = t
@@ -642,16 +595,7 @@ func PingInterval(t time.Duration) Option {
 	}
 }
 
-// MaxPingsOutstanding is an Option to set the maximum number of ping requests
-// that can go un-answered by the server before closing the connection.
-func MaxPingsOutstanding(max int) Option {
-	return func(o *Options) error {
-		o.MaxPingsOut = max
-		return nil
-	}
-}
-
-// ReconnectBufSize sets the buffer size of messages kept while busy reconnecting.
+// ReconnectBufSize sets the buffer size of messages kept while busy reconnecting
 func ReconnectBufSize(size int) Option {
 	return func(o *Options) error {
 		o.ReconnectBufSize = size
@@ -663,14 +607,6 @@ func ReconnectBufSize(size int) Option {
 func Timeout(t time.Duration) Option {
 	return func(o *Options) error {
 		o.Timeout = t
-		return nil
-	}
-}
-
-// FlusherTimeout is an Option to set the write (and flush) timeout on a connection.
-func FlusherTimeout(t time.Duration) Option {
-	return func(o *Options) error {
-		o.FlusherTimeout = t
 		return nil
 	}
 }
@@ -733,85 +669,11 @@ func UserInfo(user, password string) Option {
 	}
 }
 
-// Token is an Option to set the token to use
-// when a token is not included directly in the URLs
-// and when a token handler is not provided.
+// Token is an Option to set the token to use when not included
+// directly in the URLs.
 func Token(token string) Option {
 	return func(o *Options) error {
-		if o.TokenHandler != nil {
-			return ErrTokenAlreadySet
-		}
 		o.Token = token
-		return nil
-	}
-}
-
-// TokenHandler is an Option to set the token handler to use
-// when a token is not included directly in the URLs
-// and when a token is not set.
-func TokenHandler(cb AuthTokenHandler) Option {
-	return func(o *Options) error {
-		if o.Token != "" {
-			return ErrTokenAlreadySet
-		}
-		o.TokenHandler = cb
-		return nil
-	}
-}
-
-// UserCredentials is a convenience function that takes a filename
-// for a user's JWT and a filename for the user's private Nkey seed.
-func UserCredentials(userOrChainedFile string, seedFiles ...string) Option {
-	userCB := func() (string, error) {
-		return userFromFile(userOrChainedFile)
-	}
-	var keyFile string
-	if len(seedFiles) > 0 {
-		keyFile = seedFiles[0]
-	} else {
-		keyFile = userOrChainedFile
-	}
-	sigCB := func(nonce []byte) ([]byte, error) {
-		return sigHandler(nonce, keyFile)
-	}
-	return UserJWT(userCB, sigCB)
-}
-
-// UserJWT will set the callbacks to retrieve the user's JWT and
-// the signature callback to sign the server nonce. This an the Nkey
-// option are mutually exclusive.
-func UserJWT(userCB UserJWTHandler, sigCB SignatureHandler) Option {
-	return func(o *Options) error {
-		if userCB == nil {
-			return ErrNoUserCB
-		}
-		if sigCB == nil {
-			return ErrUserButNoSigCB
-		}
-		o.UserJWT = userCB
-		o.SignatureCB = sigCB
-		return nil
-	}
-}
-
-// Nkey will set the public Nkey and the signature callback to
-// sign the server nonce.
-func Nkey(pubKey string, sigCB SignatureHandler) Option {
-	return func(o *Options) error {
-		o.Nkey = pubKey
-		o.SignatureCB = sigCB
-		if pubKey != "" && sigCB == nil {
-			return ErrNkeyButNoSigCB
-		}
-		return nil
-	}
-}
-
-// SyncQueueLen will set the maximum queue len for the internal
-// channel used for SubscribeSync().
-func SyncQueueLen(max int) Option {
-	return func(o *Options) error {
-		o.SubChanLen = max
 		return nil
 	}
 }
@@ -896,8 +758,8 @@ func (nc *Conn) SetErrorHandler(cb ErrHandler) {
 	nc.Opts.AsyncErrorCB = cb
 }
 
-// Process the url string argument to Connect.
-// Return an array of urls, even if only one.
+// Process the url string argument to Connect. Return an array of
+// urls, even if only one.
 func processUrlString(url string) []string {
 	urls := strings.Split(url, ",")
 	for i, s := range urls {
@@ -925,16 +787,6 @@ func (o Options) Connect() (*Conn, error) {
 	// Ensure that Timeout is not 0
 	if nc.Opts.Timeout == 0 {
 		nc.Opts.Timeout = DefaultTimeout
-	}
-
-	// Check first for user jwt callback being defined and nkey.
-	if nc.Opts.UserJWT != nil && nc.Opts.Nkey != "" {
-		return nil, ErrNkeyAndUser
-	}
-
-	// Check if we have an nkey but no signature callback defined.
-	if nc.Opts.Nkey != "" && nc.Opts.SignatureCB == nil {
-		return nil, ErrNkeyButNoSigCB
 	}
 
 	// Allow custom Dialer for connecting using DialTimeout by default
@@ -991,7 +843,7 @@ func (nc *Conn) currentServer() (int, *srv) {
 		if s == nil {
 			continue
 		}
-		if s == nc.current {
+		if s.url == nc.url {
 			return i, s
 		}
 	}
@@ -1015,23 +867,22 @@ func (nc *Conn) selectNextServer() (*srv, error) {
 		nc.srvPool = sp[0 : num-1]
 	}
 	if len(nc.srvPool) <= 0 {
-		nc.current = nil
+		nc.url = nil
 		return nil, ErrNoServers
 	}
-	nc.current = nc.srvPool[0]
+	nc.url = nc.srvPool[0].url
 	return nc.srvPool[0], nil
 }
 
-// Will assign the correct server to nc.current
+// Will assign the correct server to the nc.Url
 func (nc *Conn) pickServer() error {
-	nc.current = nil
+	nc.url = nil
 	if len(nc.srvPool) <= 0 {
 		return ErrNoServers
 	}
-
 	for _, s := range nc.srvPool {
 		if s != nil {
-			nc.current = s
+			nc.url = s.url
 			return nil
 		}
 	}
@@ -1049,9 +900,9 @@ func (nc *Conn) setupServerPool() error {
 	nc.urls = make(map[string]struct{}, srvPoolSize)
 
 	// Create srv objects from each url string in nc.Opts.Servers
-	// and add them to the pool.
+	// and add them to the pool
 	for _, urlString := range nc.Opts.Servers {
-		if err := nc.addURLToPool(urlString, false, false); err != nil {
+		if err := nc.addURLToPool(urlString, false); err != nil {
 			return err
 		}
 	}
@@ -1065,7 +916,7 @@ func (nc *Conn) setupServerPool() error {
 	// but we always allowed that, so continue to do so.
 	if nc.Opts.Url != _EMPTY_ {
 		// Add to the end of the array
-		if err := nc.addURLToPool(nc.Opts.Url, false, false); err != nil {
+		if err := nc.addURLToPool(nc.Opts.Url, false); err != nil {
 			return err
 		}
 		// Then swap it with first to guarantee that Options.Url is tried first.
@@ -1075,7 +926,7 @@ func (nc *Conn) setupServerPool() error {
 		}
 	} else if len(nc.srvPool) <= 0 {
 		// Place default URL if pool is empty.
-		if err := nc.addURLToPool(DefaultURL, false, false); err != nil {
+		if err := nc.addURLToPool(DefaultURL, false); err != nil {
 			return err
 		}
 	}
@@ -1094,23 +945,10 @@ func (nc *Conn) setupServerPool() error {
 	return nc.pickServer()
 }
 
-// Helper function to return scheme
-func (nc *Conn) connScheme() string {
-	if nc.Opts.Secure {
-		return tlsScheme
-	}
-	return "nats"
-}
-
-// Return true iff u.Hostname() is an IP address.
-func hostIsIP(u *url.URL) bool {
-	return net.ParseIP(u.Hostname()) != nil
-}
-
 // addURLToPool adds an entry to the server pool
-func (nc *Conn) addURLToPool(sURL string, implicit, saveTLSName bool) error {
+func (nc *Conn) addURLToPool(sURL string, implicit bool) error {
 	if !strings.Contains(sURL, "://") {
-		sURL = fmt.Sprintf("%s://%s", nc.connScheme(), sURL)
+		sURL = "nats://" + sURL
 	}
 	var (
 		u   *url.URL
@@ -1131,24 +969,7 @@ func (nc *Conn) addURLToPool(sURL string, implicit, saveTLSName bool) error {
 		}
 		sURL += defaultPortString
 	}
-
-	var tlsName string
-	if implicit {
-		curl := nc.current.url
-		// Check to see if we do not have a url.User but current connected
-		// url does. If so copy over.
-		if u.User == nil && curl.User != nil {
-			u.User = curl.User
-		}
-		// We are checking to see if we have a secure connection and are
-		// adding an implicit server that just has an IP. If so we will remember
-		// the current hostname we are connected to.
-		if saveTLSName && hostIsIP(u) {
-			tlsName = curl.Hostname()
-		}
-	}
-
-	s := &srv{url: u, isImplicit: implicit, tlsName: tlsName}
+	s := &srv{url: u, isImplicit: implicit}
 	nc.srvPool = append(nc.srvPool, s)
 	nc.urls[u.Host] = struct{}{}
 	return nil
@@ -1167,14 +988,6 @@ func (nc *Conn) shufflePool() {
 	}
 }
 
-func (nc *Conn) newBuffer() *bufio.Writer {
-	var w io.Writer = nc.conn
-	if nc.Opts.FlusherTimeout > 0 {
-		w = &timeoutWriter{conn: nc.conn, timeout: nc.Opts.FlusherTimeout}
-	}
-	return bufio.NewWriterSize(w, defaultBufSize)
-}
-
 // createConn will connect to the server and wrap the appropriate
 // bufio structures. It will do the right thing when an existing
 // connection is in place.
@@ -1188,38 +1001,14 @@ func (nc *Conn) createConn() (err error) {
 		cur.lastAttempt = time.Now()
 	}
 
-	// We will auto-expand host names if they resolve to multiple IPs
-	hosts := map[string]struct{}{}
-	u := nc.current.url
-
-	if net.ParseIP(u.Hostname()) == nil {
-		addrs, _ := net.LookupHost(u.Hostname())
-		for _, addr := range addrs {
-			hosts[net.JoinHostPort(addr, u.Port())] = struct{}{}
-		}
-	}
-	// Fall back to what we were given.
-	if len(hosts) == 0 {
-		hosts[u.Host] = struct{}{}
-	}
-
 	// CustomDialer takes precedence. If not set, use Opts.Dialer which
 	// is set to a default *net.Dialer (in Connect()) if not explicitly
 	// set by the user.
 	dialer := nc.Opts.CustomDialer
 	if dialer == nil {
-		// We will copy and shorten the timeout if we have multiple hosts to try.
-		copyDialer := *nc.Opts.Dialer
-		copyDialer.Timeout = copyDialer.Timeout / time.Duration(len(hosts))
-		dialer = &copyDialer
+		dialer = nc.Opts.Dialer
 	}
-
-	for host := range hosts {
-		nc.conn, err = dialer.Dial("tcp", host)
-		if err == nil {
-			break
-		}
-	}
+	nc.conn, err = dialer.Dial("tcp", nc.url.Host)
 	if err != nil {
 		return err
 	}
@@ -1234,35 +1023,29 @@ func (nc *Conn) createConn() (err error) {
 		// Move to pending buffer.
 		nc.bw.Flush()
 	}
-	nc.bw = nc.newBuffer()
+	nc.bw = bufio.NewWriterSize(nc.conn, defaultBufSize)
 	return nil
 }
 
 // makeTLSConn will wrap an existing Conn using TLS
-func (nc *Conn) makeTLSConn() error {
-	// Allow the user to configure their own tls.Config structure.
-	var tlsCopy *tls.Config
+func (nc *Conn) makeTLSConn() {
+	// Allow the user to configure their own tls.Config structure, otherwise
+	// default to InsecureSkipVerify.
+	// TODO(dlc) - We should make the more secure version the default.
 	if nc.Opts.TLSConfig != nil {
-		tlsCopy = util.CloneTLSConfig(nc.Opts.TLSConfig)
-	} else {
-		tlsCopy = &tls.Config{}
-	}
-	// If its blank we will override it with the current host
-	if tlsCopy.ServerName == _EMPTY_ {
-		if nc.current.tlsName != _EMPTY_ {
-			tlsCopy.ServerName = nc.current.tlsName
-		} else {
-			h, _, _ := net.SplitHostPort(nc.current.url.Host)
+		tlsCopy := util.CloneTLSConfig(nc.Opts.TLSConfig)
+		// If its blank we will override it with the current host
+		if tlsCopy.ServerName == _EMPTY_ {
+			h, _, _ := net.SplitHostPort(nc.url.Host)
 			tlsCopy.ServerName = h
 		}
+		nc.conn = tls.Client(nc.conn, tlsCopy)
+	} else {
+		nc.conn = tls.Client(nc.conn, &tls.Config{InsecureSkipVerify: true})
 	}
-	nc.conn = tls.Client(nc.conn, tlsCopy)
 	conn := nc.conn.(*tls.Conn)
-	if err := conn.Handshake(); err != nil {
-		return err
-	}
-	nc.bw = nc.newBuffer()
-	return nil
+	conn.Handshake()
+	nc.bw = bufio.NewWriterSize(nc.conn, defaultBufSize)
 }
 
 // waitForExits will wait for all socket watcher Go routines to
@@ -1283,29 +1066,12 @@ func (nc *Conn) ConnectedUrl() string {
 	if nc == nil {
 		return _EMPTY_
 	}
-
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
-
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	if nc.status != CONNECTED {
 		return _EMPTY_
 	}
-	return nc.current.url.String()
-}
-
-// ConnectedAddr returns the connected server's IP
-func (nc *Conn) ConnectedAddr() string {
-	if nc == nil {
-		return _EMPTY_
-	}
-
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
-
-	if nc.status != CONNECTED {
-		return _EMPTY_
-	}
-	return nc.conn.RemoteAddr().String()
+	return nc.url.String()
 }
 
 // Report the connected server's Id
@@ -1313,10 +1079,8 @@ func (nc *Conn) ConnectedServerId() string {
 	if nc == nil {
 		return _EMPTY_
 	}
-
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
-
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	if nc.status != CONNECTED {
 		return _EMPTY_
 	}
@@ -1389,7 +1153,7 @@ func (nc *Conn) connect() error {
 	nc.initc = true
 	// The pool may change inside the loop iteration due to INFO protocol.
 	for i := 0; i < len(nc.srvPool); i++ {
-		nc.current = nc.srvPool[i]
+		nc.url = nc.srvPool[i].url
 
 		if err := nc.createConn(); err == nil {
 			// This was moved out of processConnectInit() because
@@ -1408,7 +1172,7 @@ func (nc *Conn) connect() error {
 				nc.mu.Unlock()
 				nc.close(DISCONNECTED, false)
 				nc.mu.Lock()
-				nc.current = nil
+				nc.url = nil
 			}
 		} else {
 			// Cancel out default connection refused, will trigger the
@@ -1419,10 +1183,11 @@ func (nc *Conn) connect() error {
 		}
 	}
 	nc.initc = false
+	defer nc.mu.Unlock()
+
 	if returnedErr == nil && nc.status != CONNECTED {
 		returnedErr = ErrNoServers
 	}
-	nc.mu.Unlock()
 	return returnedErr
 }
 
@@ -1443,9 +1208,7 @@ func (nc *Conn) checkForSecure() error {
 
 	// Need to rewrap with bufio
 	if o.Secure {
-		if err := nc.makeTLSConn(); err != nil {
-			return err
-		}
+		nc.makeTLSConn()
 	}
 	return nil
 }
@@ -1472,10 +1235,6 @@ func (nc *Conn) processExpectedInfo() error {
 		return err
 	}
 
-	if nc.Opts.Nkey != "" && nc.info.Nonce == "" {
-		return ErrNkeysNotSupported
-	}
-
 	return nc.checkForSecure()
 }
 
@@ -1492,8 +1251,8 @@ func (nc *Conn) sendProto(proto string) {
 // applicable. The lock is assumed to be held upon entering.
 func (nc *Conn) connectProto() (string, error) {
 	o := nc.Opts
-	var nkey, sig, user, pass, token, ujwt string
-	u := nc.current.url.User
+	var user, pass, token string
+	u := nc.url.User
 	if u != nil {
 		// if no password, assume username is authToken
 		if _, ok := u.Password(); !ok {
@@ -1504,46 +1263,12 @@ func (nc *Conn) connectProto() (string, error) {
 		}
 	} else {
 		// Take from options (possibly all empty strings)
-		user = o.User
-		pass = o.Password
-		token = o.Token
-		nkey = o.Nkey
+		user = nc.Opts.User
+		pass = nc.Opts.Password
+		token = nc.Opts.Token
 	}
 
-	// Look for user jwt.
-	if o.UserJWT != nil {
-		if jwt, err := o.UserJWT(); err != nil {
-			return _EMPTY_, err
-		} else {
-			ujwt = jwt
-		}
-		if nkey != _EMPTY_ {
-			return _EMPTY_, ErrNkeyAndUser
-		}
-	}
-
-	if ujwt != _EMPTY_ || nkey != _EMPTY_ {
-		if o.SignatureCB == nil {
-			if ujwt == _EMPTY_ {
-				return _EMPTY_, ErrNkeyButNoSigCB
-			}
-			return _EMPTY_, ErrUserButNoSigCB
-		}
-		sigraw, err := o.SignatureCB([]byte(nc.info.Nonce))
-		if err != nil {
-			return _EMPTY_, err
-		}
-		sig = base64.RawURLEncoding.EncodeToString(sigraw)
-	}
-
-	if nc.Opts.TokenHandler != nil {
-		if token != _EMPTY_ {
-			return _EMPTY_, ErrTokenAlreadySet
-		}
-		token = nc.Opts.TokenHandler()
-	}
-
-	cinfo := connectInfo{o.Verbose, o.Pedantic, ujwt, nkey, sig, user, pass, token,
+	cinfo := connectInfo{o.Verbose, o.Pedantic, user, pass, token,
 		o.Secure, o.Name, LangString, Version, clientProtoInfo, !o.NoEcho}
 
 	b, err := json.Marshal(cinfo)
@@ -1561,7 +1286,7 @@ func (nc *Conn) connectProto() (string, error) {
 
 // normalizeErr removes the prefix -ERR, trim spaces and remove the quotes.
 func normalizeErr(line string) string {
-	s := strings.TrimSpace(strings.TrimPrefix(line, _ERR_OP_))
+	s := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, _ERR_OP_)))
 	s = strings.TrimLeft(strings.TrimRight(s, "'"), "'")
 	return s
 }
@@ -1967,14 +1692,14 @@ func (nc *Conn) readLoop() {
 	b := make([]byte, defaultBufSize)
 
 	for {
-		// ps is thread safe, so RLock is okay
-		nc.mu.RLock()
+		// FIXME(dlc): RWLock here?
+		nc.mu.Lock()
 		sb := nc.isClosed() || nc.isReconnecting()
 		if sb {
 			nc.ps = &parseState{}
 		}
 		conn := nc.conn
-		nc.mu.RUnlock()
+		nc.mu.Unlock()
 
 		if sb || conn == nil {
 			break
@@ -1985,6 +1710,7 @@ func (nc *Conn) readLoop() {
 			nc.processOpErr(err)
 			break
 		}
+
 		if err := nc.parse(b[:n]); err != nil {
 			nc.processOpErr(err)
 			break
@@ -2214,6 +1940,7 @@ func (nc *Conn) flusher() {
 	bw := nc.bw
 	conn := nc.conn
 	fch := nc.fch
+	flusherTimeout := nc.Opts.FlusherTimeout
 	nc.mu.Unlock()
 
 	if conn == nil || bw == nil {
@@ -2232,11 +1959,18 @@ func (nc *Conn) flusher() {
 			return
 		}
 		if bw.Buffered() > 0 {
+			// Allow customizing how long we should wait for a flush to be done
+			// to prevent unhealthy connections blocking the client for too long.
+			if flusherTimeout > 0 {
+				conn.SetWriteDeadline(time.Now().Add(flusherTimeout))
+			}
+
 			if err := bw.Flush(); err != nil {
 				if nc.err == nil {
 					nc.err = err
 				}
 			}
+			conn.SetWriteDeadline(time.Time{})
 		}
 		nc.mu.Unlock()
 	}
@@ -2315,7 +2049,7 @@ func (nc *Conn) processInfo(info string) error {
 		delete(tmp, curl)
 		// Keep servers that were set through Options, but also the one that
 		// we are currently connected to (even if it is a discovered server).
-		if !srv.isImplicit || srv.url == nc.current.url {
+		if !srv.isImplicit || srv.url == nc.url {
 			continue
 		}
 		if !inInfo {
@@ -2326,11 +2060,6 @@ func (nc *Conn) processInfo(info string) error {
 			i--
 		}
 	}
-	// Figure out if we should save off the current non-IP hostname if we encounter a bare IP.
-	var saveTLS bool
-	if nc.current != nil && nc.Opts.Secure && !hostIsIP(nc.current.url) {
-		saveTLS = true
-	}
 	// If there are any left in the tmp map, these are new (or restarted) servers
 	// and need to be added to the pool.
 	for curl := range tmp {
@@ -2339,12 +2068,11 @@ func (nc *Conn) processInfo(info string) error {
 		if _, present := nc.urls[curl]; !present {
 			hasNew = true
 		}
-		nc.addURLToPool(fmt.Sprintf("%s://%s", nc.connScheme(), curl), true, saveTLS)
+		nc.addURLToPool(fmt.Sprintf("nats://%s", curl), true)
 	}
 	if hasNew && !nc.initc && nc.Opts.DiscoveredServersCB != nil {
 		nc.ach.push(func() { nc.Opts.DiscoveredServersCB(nc) })
 	}
-
 	return nil
 }
 
@@ -2365,30 +2093,28 @@ func (nc *Conn) LastError() error {
 	if nc == nil {
 		return ErrInvalidConnection
 	}
-	nc.mu.RLock()
+	nc.mu.Lock()
 	err := nc.err
-	nc.mu.RUnlock()
+	nc.mu.Unlock()
 	return err
 }
 
 // processErr processes any error messages from the server and
 // sets the connection's lastError.
-func (nc *Conn) processErr(ie string) {
-	// Trim, remove quotes
-	ne := normalizeErr(ie)
-	// convert to lower case.
-	e := strings.ToLower(ne)
+func (nc *Conn) processErr(e string) {
+	// Trim, remove quotes, convert to lower case.
+	e = normalizeErr(e)
 
 	// FIXME(dlc) - process Slow Consumer signals special.
 	if e == STALE_CONNECTION {
 		nc.processOpErr(ErrStaleConnection)
 	} else if strings.HasPrefix(e, PERMISSIONS_ERR) {
-		nc.processPermissionsViolation(ne)
+		nc.processPermissionsViolation(e)
 	} else if strings.HasPrefix(e, AUTHORIZATION_ERR) {
-		nc.processAuthorizationViolation(ne)
+		nc.processAuthorizationViolation(e)
 	} else {
 		nc.mu.Lock()
-		nc.err = errors.New("nats: " + ne)
+		nc.err = errors.New("nats: " + e)
 		nc.mu.Unlock()
 		nc.Close()
 	}
@@ -2585,7 +2311,9 @@ func (nc *Conn) Request(subj string, data []byte, timeout time.Duration) (*Msg, 
 
 	// Do setup for the new style.
 	if nc.respMap == nil {
-		nc.initNewResp()
+		// _INBOX wildcard
+		nc.respSub = fmt.Sprintf("%s.*", NewInbox())
+		nc.respMap = make(map[string]chan *Msg)
 	}
 	// Create literal Inbox and map to a chan msg.
 	mch := make(chan *Msg, RequestChanLen)
@@ -2652,14 +2380,9 @@ func (nc *Conn) oldRequest(subj string, data []byte, timeout time.Duration) (*Ms
 }
 
 // InboxPrefix is the prefix for all inbox subjects.
-const (
-	InboxPrefix        = "_INBOX."
-	inboxPrefixLen     = len(InboxPrefix)
-	respInboxPrefixLen = inboxPrefixLen + nuidSize + 1
-	replySuffixLen     = 8 // Gives us 62^8
-	rdigits            = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	base               = 62
-)
+const InboxPrefix = "_INBOX."
+const inboxPrefixLen = len(InboxPrefix)
+const respInboxPrefixLen = inboxPrefixLen + nuidSize + 1
 
 // NewInbox will return an inbox string which can be used for directed replies from
 // subscribers. These are guaranteed to be unique, but can be shared and subscribed
@@ -2673,38 +2396,15 @@ func NewInbox() string {
 	return string(b[:])
 }
 
-// Function to init new response structures.
-func (nc *Conn) initNewResp() {
-	// _INBOX wildcard
-	nc.respSub = fmt.Sprintf("%s.*", NewInbox())
-	nc.respMap = make(map[string]chan *Msg)
-	nc.respRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-}
-
-// newRespInbox creates a new literal response subject
-// that will trigger the mux subscription handler.
-// Lock should be held.
+// Creates a new literal response subject that will trigger
+// the global subscription handler.
 func (nc *Conn) newRespInbox() string {
-	if nc.respMap == nil {
-		nc.initNewResp()
-	}
-	var b [respInboxPrefixLen + replySuffixLen]byte
+	var b [inboxPrefixLen + (2 * nuidSize) + 1]byte
 	pres := b[:respInboxPrefixLen]
 	copy(pres, nc.respSub)
-	rn := nc.respRand.Int63()
-	for i, l := respInboxPrefixLen, rn; i < len(b); i++ {
-		b[i] = rdigits[l%base]
-		l /= base
-	}
+	ns := b[respInboxPrefixLen:]
+	copy(ns, nuid.Next())
 	return string(b[:])
-}
-
-// NewRespInbox is the new format used for _INBOX.
-func (nc *Conn) NewRespInbox() string {
-	nc.mu.Lock()
-	s := nc.newRespInbox()
-	nc.mu.Unlock()
-	return s
 }
 
 // respToken will return the last token of a literal response inbox
@@ -2790,6 +2490,7 @@ func (nc *Conn) subscribe(subj, queue string, cb MsgHandler, ch chan *Msg) (*Sub
 	nc.mu.Lock()
 	// ok here, but defer is generally expensive
 	defer nc.mu.Unlock()
+	defer nc.kickFlusher()
 
 	// Check for some error conditions.
 	if nc.isClosed() {
@@ -2826,22 +2527,17 @@ func (nc *Conn) subscribe(subj, queue string, cb MsgHandler, ch chan *Msg) (*Sub
 	nc.subsMu.Unlock()
 
 	// We will send these for all subs when we reconnect
-	// so that we can suppress here if reconnecting.
+	// so that we can suppress here.
 	if !nc.isReconnecting() {
 		fmt.Fprintf(nc.bw, subProto, subj, queue, sub.sid)
-		// Kick flusher if needed.
-		if len(nc.fch) == 0 {
-			nc.kickFlusher()
-		}
 	}
-
 	return sub, nil
 }
 
 // NumSubscriptions returns active number of subscriptions.
 func (nc *Conn) NumSubscriptions() int {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return len(nc.subs)
 }
 
@@ -3047,23 +2743,6 @@ func (s *Subscription) NextMsg(timeout time.Duration) (*Msg, error) {
 	var ok bool
 	var msg *Msg
 
-	// If something is available right away, let's optimize that case.
-	select {
-	case msg, ok = <-mch:
-		if !ok {
-			return nil, ErrConnectionClosed
-		}
-		if err := s.processNextMsgDelivered(msg); err != nil {
-			return nil, err
-		} else {
-			return msg, nil
-		}
-	default:
-	}
-
-	// If we are here a message was not immediately available, so lets loop
-	// with a timeout.
-
 	t := globalTimerPool.Get(timeout)
 	defer globalTimerPool.Put(t)
 
@@ -3072,7 +2751,8 @@ func (s *Subscription) NextMsg(timeout time.Duration) (*Msg, error) {
 		if !ok {
 			return nil, ErrConnectionClosed
 		}
-		if err := s.processNextMsgDelivered(msg); err != nil {
+		err := s.processNextMsgDelivered(msg)
+		if err != nil {
 			return nil, err
 		}
 	case <-t.C:
@@ -3371,8 +3051,8 @@ func (nc *Conn) Flush() error {
 // Buffered will return the number of bytes buffered to be sent to the server.
 // FIXME(dlc) take into account disconnected state.
 func (nc *Conn) Buffered() (int, error) {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	if nc.isClosed() || nc.bw == nil {
 		return -1, ErrConnectionClosed
 	}
@@ -3398,6 +3078,7 @@ func (nc *Conn) resendSubscriptions() {
 			if s.delivered < s.max {
 				adjustedMax = s.max - s.delivered
 			}
+
 			// adjustedMax could be 0 here if the number of delivered msgs
 			// reached the max, if so unsubscribe.
 			if adjustedMax == 0 {
@@ -3525,22 +3206,22 @@ func (nc *Conn) Close() {
 
 // IsClosed tests if a Conn has been closed.
 func (nc *Conn) IsClosed() bool {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.isClosed()
 }
 
 // IsReconnecting tests if a Conn is reconnecting.
 func (nc *Conn) IsReconnecting() bool {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.isReconnecting()
 }
 
 // IsConnected tests if a Conn is connected.
 func (nc *Conn) IsConnected() bool {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.isConnected()
 }
 
@@ -3560,7 +3241,6 @@ func (nc *Conn) drainConnection() {
 	// for pushing errors with context.
 	pushErr := func(err error) {
 		nc.mu.Lock()
-		nc.err = err
 		if errCB != nil {
 			nc.ach.push(func() { errCB(nc, nil, err) })
 		}
@@ -3632,8 +3312,8 @@ func (nc *Conn) Drain() error {
 
 // IsDraining tests if a Conn is in the draining state.
 func (nc *Conn) IsDraining() bool {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.isDraining()
 }
 
@@ -3656,8 +3336,8 @@ func (nc *Conn) getServers(implicitOnly bool) []string {
 // authentication is enabled, use UserInfo or Token when connecting with
 // these urls.
 func (nc *Conn) Servers() []string {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.getServers(false)
 }
 
@@ -3665,15 +3345,15 @@ func (nc *Conn) Servers() []string {
 // after a connection has been established. If authentication is enabled,
 // use UserInfo or Token when connecting with these urls.
 func (nc *Conn) DiscoveredServers() []string {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.getServers(true)
 }
 
 // Status returns the current state of the connection.
 func (nc *Conn) Status() Status {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.status
 }
 
@@ -3729,22 +3409,22 @@ func (nc *Conn) Stats() Statistics {
 // This is set by the server configuration and delivered to the client
 // upon connect.
 func (nc *Conn) MaxPayload() int64 {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.info.MaxPayload
 }
 
 // AuthRequired will return if the connected server requires authorization.
 func (nc *Conn) AuthRequired() bool {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.info.AuthRequired
 }
 
 // TLSRequired will return if the connected server requires TLS connections.
 func (nc *Conn) TLSRequired() bool {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
 	return nc.info.TLSRequired
 }
 
@@ -3794,152 +3474,4 @@ func (nc *Conn) Barrier(f func()) error {
 	nc.subsMu.Unlock()
 	nc.mu.Unlock()
 	return nil
-}
-
-// GetClientID returns the client ID assigned by the server to which
-// the client is currently connected to. Note that the value may change if
-// the client reconnects.
-// This function returns ErrNoClientIDReturned if the server is of a
-// version prior to 1.2.0.
-func (nc *Conn) GetClientID() (uint64, error) {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
-	if nc.isClosed() {
-		return 0, ErrConnectionClosed
-	}
-	if nc.info.CID == 0 {
-		return 0, ErrClientIDNotSupported
-	}
-	return nc.info.CID, nil
-}
-
-// NkeyOptionFromSeed will load an nkey pair from a seed file.
-// It will return the NKey Option and will handle
-// signing of nonce challenges from the server. It will take
-// care to not hold keys in memory and to wipe memory.
-func NkeyOptionFromSeed(seedFile string) (Option, error) {
-	kp, err := nkeyPairFromSeedFile(seedFile)
-	if err != nil {
-		return nil, err
-	}
-	// Wipe our key on exit.
-	defer kp.Wipe()
-
-	pub, err := kp.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	if !nkeys.IsValidPublicUserKey(pub) {
-		return nil, fmt.Errorf("nats: Not a valid nkey user seed")
-	}
-	sigCB := func(nonce []byte) ([]byte, error) {
-		return sigHandler(nonce, seedFile)
-	}
-	return Nkey(string(pub), sigCB), nil
-}
-
-// This is a regex to match decorated jwts in keys/seeds.
-// .e.g.
-//  -----BEGIN NATS USER JWT-----
-//  eyJ0eXAiOiJqd3QiLCJhbGciOiJlZDI1NTE5...
-//  ------END NATS USER JWT------
-//
-//  ************************* IMPORTANT *************************
-//  NKEY Seed printed below can be used sign and prove identity.
-//  NKEYs are sensitive and should be treated as secrets.
-//
-//  -----BEGIN USER NKEY SEED-----
-//  SUAIO3FHUX5PNV2LQIIP7TZ3N4L7TX3W53MQGEIVYFIGA635OZCKEYHFLM
-//  ------END USER NKEY SEED------
-
-var nscDecoratedRe = regexp.MustCompile(`\s*(?:(?:[-]{3,}[^\n]*[-]{3,}\n)(.+)(?:\n\s*[-]{3,}[^\n]*[-]{3,}\n))`)
-
-func userFromFile(userFile string) (string, error) {
-	contents, err := ioutil.ReadFile(userFile)
-	if err != nil {
-		return _EMPTY_, fmt.Errorf("nats: %v", err)
-	}
-	defer wipeSlice(contents)
-
-	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
-	if len(items) == 0 {
-		return string(contents), nil
-	}
-	// First result should be the user JWT.
-	// We copy here so that if the file contained a seed file too we wipe appropriately.
-	raw := items[0][1]
-	tmp := make([]byte, len(raw))
-	copy(tmp, raw)
-	return string(tmp), nil
-}
-
-func nkeyPairFromSeedFile(seedFile string) (nkeys.KeyPair, error) {
-	var seed []byte
-	contents, err := ioutil.ReadFile(seedFile)
-	if err != nil {
-		return nil, fmt.Errorf("nats: %v", err)
-	}
-	defer wipeSlice(contents)
-
-	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
-	if len(items) > 1 {
-		seed = items[1][1]
-	} else {
-		lines := bytes.Split(contents, []byte("\n"))
-		for _, line := range lines {
-			if bytes.HasPrefix(bytes.TrimSpace(line), []byte("SU")) {
-				seed = line
-				break
-			}
-		}
-	}
-
-	if seed == nil {
-		return nil, fmt.Errorf("nats: No nkey user seed found in %q", seedFile)
-	}
-	kp, err := nkeys.FromSeed(seed)
-	if err != nil {
-		return nil, err
-	}
-	return kp, nil
-}
-
-// Sign authentication challenges from the server.
-// Do not keep private seed in memory.
-func sigHandler(nonce []byte, seedFile string) ([]byte, error) {
-	kp, err := nkeyPairFromSeedFile(seedFile)
-	if err != nil {
-		return nil, err
-	}
-	// Wipe our key on exit.
-	defer kp.Wipe()
-
-	sig, _ := kp.Sign(nonce)
-	return sig, nil
-}
-
-// Just wipe slice with 'x', for clearing contents of nkey seed file.
-func wipeSlice(buf []byte) {
-	for i := range buf {
-		buf[i] = 'x'
-	}
-}
-
-type timeoutWriter struct {
-	timeout time.Duration
-	conn    net.Conn
-	err     error
-}
-
-// Write implements the io.Writer interface.
-func (tw *timeoutWriter) Write(p []byte) (int, error) {
-	if tw.err != nil {
-		return 0, tw.err
-	}
-
-	var n int
-	tw.conn.SetWriteDeadline(time.Now().Add(tw.timeout))
-	n, tw.err = tw.conn.Write(p)
-	tw.conn.SetWriteDeadline(time.Time{})
-	return n, tw.err
 }

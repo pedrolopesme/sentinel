@@ -2,11 +2,10 @@ version: '3.6'
 services:
   stocks_nats:
     container_name: "sentinel-stocks-nats"
-    entrypoint: "/gnatsd -DV"
     expose:
       - "4222"
     hostname: "nats-server"
-    image: "nats:1.4.1"
+    image: "nats-streaming:0.12.0-linux"
     ports:
       - "8222:8222"
       - "4222:4222"

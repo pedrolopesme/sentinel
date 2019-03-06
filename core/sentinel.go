@@ -51,6 +51,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 	// TODO what if publish fails? What about a retry logic?
 	// TODO format message properly
 	var stockNATSClient = s.stocksNats.GetConnection()
+	defer stockNATSClient.Close()
 	for k, y := range stocks {
 		stock := fmt.Sprint(k, ">>>", y.Price.High)
 		if err = stockNATSClient.Publish(NATS_STOCKS_SUBJECT, []byte(stock)); err != nil {
@@ -70,8 +71,14 @@ func (s *StockSentinel) Kill() error {
 
 // NewSentinel
 // TODO add tests
+// TODO add logging
 func NewStockSentinel(config *SentinelConfig, schedule *Schedule) (sentinel *StockSentinel, err error) {
-	stockNATS, err := client.NewNATSServer(config.NATSStocksURI)
+	clientID, err := uuid.NewV4()
+	if err != nil {
+		fmt.Println("Cant get stocks due to", err.Error())
+	}
+
+	stockNATS, err := client.NewNATSServer(config.NATSStocksClusterID, clientID.String(), config.NATSStocksURI)
 	if err != nil {
 		return nil, err
 	}

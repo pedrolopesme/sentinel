@@ -5,17 +5,19 @@ import (
 )
 
 const (
-	ALPHA_VANTAGE_ENV_VAR_NAME = "ALPHAVANTAGE_KEY"
-	LOGS_PATH_ENV_VAR_NAME     = "SENTINEL_LOGS_PATH"
-	NATS_STOCKS_VAR_NAME       = "NATS_STOCKS_DATA_URI"
-	DEFAULT_LOGS_PATH          = "./logs"
+	ALPHA_VANTAGE_ENV_VAR_NAME     = "ALPHAVANTAGE_KEY"
+	LOGS_PATH_ENV_VAR_NAME         = "SENTINEL_LOGS_PATH"
+	NATS_STOCKS_VAR_NAME           = "NATS_STOCKS_DATA_URI"
+	NATS_STOCKS_CLUSTERID_VAR_NAME = "NATS_STOCKS_CLUSTERID"
+	DEFAULT_LOGS_PATH              = "./logs"
 )
 
 // SentinelConfig stores the general configuration directives for a Sentinel to run
 type SentinelConfig struct {
-	AlphaVantageKey string
-	LogsPath        string
-	NATSStocksURI   string
+	AlphaVantageKey     string
+	LogsPath            string
+	NATSStocksURI       string
+	NATSStocksClusterID string
 }
 
 // NewSentinelConfig creates an instance of Sentinel Config, loading
@@ -27,15 +29,21 @@ func NewSentinelConfig() (config *SentinelConfig, err error) {
 		return nil, err
 	}
 
-	getStocksNATSURI, err := getStocksNATSURI()
+	stocksNATSURI, err := getStocksNATSURI()
+	if err != nil {
+		return nil, err
+	}
+
+	stocksNATSClusterID, err := getStocksNATSClusterId()
 	if err != nil {
 		return nil, err
 	}
 
 	config = &SentinelConfig{
-		LogsPath:        getLogsPath(),
-		AlphaVantageKey: alphaVantageKey,
-		NATSStocksURI:   getStocksNATSURI,
+		LogsPath:            getLogsPath(),
+		AlphaVantageKey:     alphaVantageKey,
+		NATSStocksURI:       stocksNATSURI,
+		NATSStocksClusterID: stocksNATSClusterID,
 	}
 	return
 }
@@ -64,10 +72,20 @@ func getAlphaVantageKey() (key string, err error) {
 // getStocksNATSURI tries to load NATS Server URI.
 // This server is responsible for storing stocks data collected by a Sentinel
 // TODO add tests
-func getStocksNATSURI() (key string, err error) {
-	key = os.Getenv(NATS_STOCKS_VAR_NAME)
-	if key == "" {
+func getStocksNATSURI() (uri string, err error) {
+	uri = os.Getenv(NATS_STOCKS_VAR_NAME)
+	if uri == "" {
 		return "", ErrStocksNATSKeyNotDefined
+	}
+	return
+}
+
+// getStocksNATSClusterId tries to load NATS Server Cluster ID.
+// TODO add tests
+func getStocksNATSClusterId() (clusterID string, err error) {
+	clusterID = os.Getenv(NATS_STOCKS_CLUSTERID_VAR_NAME)
+	if clusterID == "" {
+		return "", ErrStocksNATSClusterIDKeyNotDefined
 	}
 	return
 }

@@ -3,22 +3,52 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "kBHVjB4SJmsRHWkZQNt96W0iXF0=",
+			"checksumSHA1": "rasgUuf7DVFShc3hKeh9wjWBWO0=",
+			"path": "github.com/gogo/protobuf/gogoproto",
+			"revision": "c5a62797aee0054613cc578653a16c6237fef080",
+			"revisionTime": "2019-03-06T08:23:29Z"
+		},
+		{
+			"checksumSHA1": "jyCYGbN0KvpV6PasLXLOmNsaA3s=",
+			"path": "github.com/gogo/protobuf/proto",
+			"revision": "c5a62797aee0054613cc578653a16c6237fef080",
+			"revisionTime": "2019-03-06T08:23:29Z"
+		},
+		{
+			"checksumSHA1": "uA3fNRcrMhh6Y8ugPuoyEK72nvk=",
+			"path": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"revision": "c5a62797aee0054613cc578653a16c6237fef080",
+			"revisionTime": "2019-03-06T08:23:29Z"
+		},
+		{
+			"checksumSHA1": "6BdJ3bMkH0TPjrWAZifVRFya9BI=",
 			"path": "github.com/nats-io/go-nats",
-			"revision": "f3379e01130f595688283acd70cdb1fff65d9a4d",
-			"revisionTime": "2019-02-22T18:25:57Z"
+			"revision": "fb0396ee0bdb8018b0fef30d6d1de798ce99cd05",
+			"revisionTime": "2018-08-29T17:20:27Z"
+		},
+		{
+			"checksumSHA1": "bXtmvZknV+i3NzujoJrEmHkASfk=",
+			"path": "github.com/nats-io/go-nats-streaming",
+			"revision": "82824caf82d8e87d762226c5060006dfbd97107f",
+			"revisionTime": "2019-03-04T17:58:02Z"
+		},
+		{
+			"checksumSHA1": "QTYuG6UB01GeJAZI0S50LnQQDuI=",
+			"path": "github.com/nats-io/go-nats-streaming/pb",
+			"revision": "82824caf82d8e87d762226c5060006dfbd97107f",
+			"revisionTime": "2019-03-04T17:58:02Z"
 		},
 		{
 			"checksumSHA1": "C/TsNyFOKX2bTW3U9O3m5mQhJo8=",
 			"path": "github.com/nats-io/go-nats/encoders/builtin",
-			"revision": "f3379e01130f595688283acd70cdb1fff65d9a4d",
-			"revisionTime": "2019-02-22T18:25:57Z"
+			"revision": "fb0396ee0bdb8018b0fef30d6d1de798ce99cd05",
+			"revisionTime": "2018-08-29T17:20:27Z"
 		},
 		{
 			"checksumSHA1": "mBZQa+wv/u+0qA1ceh6MrWBEgxs=",
 			"path": "github.com/nats-io/go-nats/util",
-			"revision": "f3379e01130f595688283acd70cdb1fff65d9a4d",
-			"revisionTime": "2019-02-22T18:25:57Z"
+			"revision": "fb0396ee0bdb8018b0fef30d6d1de798ce99cd05",
+			"revisionTime": "2018-08-29T17:20:27Z"
 		},
 		{
 			"checksumSHA1": "6xwMpun2lAxptGPocW+HKJg1Xoc=",

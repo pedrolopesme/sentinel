@@ -2,27 +2,28 @@ package client
 
 import (
 	"fmt"
-	"github.com/nats-io/go-nats"
 	"os"
+
+	"github.com/nats-io/go-nats-streaming"
 )
 
 type NATSServer interface {
-	GetConnection() *nats.Conn
+	GetConnection() stan.Conn
 }
 
 type BasicNATSServer struct {
-	Conn *nats.Conn
+	Conn stan.Conn
 }
 
-func (n *BasicNATSServer) GetConnection() *nats.Conn {
+func (n *BasicNATSServer) GetConnection() stan.Conn {
 	return n.Conn
 }
 
 // TODO add some logging
 // TODO add some tests
-func NewNATSServer(uri string) (server *BasicNATSServer, err error) {
-	fmt.Printf("Trying to connect nats server %v\n", uri)
-	natsConnection, err := nats.Connect(uri)
+func NewNATSServer(clusterID string, clientID string, uri string) (server *BasicNATSServer, err error) {
+	fmt.Printf("Trying to connect to NATS server %v - %v\n", clusterID, uri)
+	natsConnection, err := stan.Connect(clusterID, clientID, stan.NatsURL(uri))
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
