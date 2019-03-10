@@ -2,15 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/pedrolopesme/sentinel/client"
 	"github.com/pedrolopesme/sentinel/core"
-	"go.uber.org/zap"
 	"os"
 )
 
 var (
 	context *core.AppContext
-	logger  *zap.Logger
 )
 
 func init() {
@@ -18,12 +15,6 @@ func init() {
 	sentinelConfig, err := core.NewSentinelConfig()
 	if err != nil {
 		fmt.Println("Fail to load sentinel config.")
-		os.Exit(1)
-	}
-
-	logger, err = initializeLogger(sentinelConfig)
-	if err != nil {
-		fmt.Printf("It was impossible to load logger. Killing sentinel. Error: %v", err.Error())
 		os.Exit(1)
 	}
 
@@ -36,69 +27,21 @@ func init() {
 
 // final runs when the Sentinel terminates
 func final() {
-	if err := logger.Sync(); err != nil {
+	if err := context.GetLogger().Sync(); err != nil {
 		fmt.Println("It was impossible to flush the logger")
 		os.Exit(1)
 	}
-}
-
-func initializeLogger(config *core.SentinelConfig) (*zap.Logger, error) {
-	cfg := zap.NewProductionConfig()
-	cfg.OutputPaths = []string{
-		fmt.Sprintf("%v/sentinels.log", config.LogsPath),
-	}
-	return cfg.Build()
 }
 
 func main() {
 	defer final()
 	printLogo()
 
-	// Hardcoding a stock to test sentinel
-	// TODO: replace this hardcoded schedule with something more flexible.
-	var schedule = core.NewSchedule("PETR3.SA", "1min")
-
-	var sentinel, err = core.NewStockSentinel(context, schedule)
-	if err != nil {
-		logger.Error("Fail to instantiate sentinel",
-			zap.String("sentinelId", sentinel.GetId()),
-			zap.String("method", "main"),
-			zap.String("error", err.Error()))
+	var sentinelDock = core.NewSentinelDock(context)
+	if err := sentinelDock.Watch(); err != nil {
+		fmt.Println("It was impossible to watch new Stocks")
 		os.Exit(1)
 	}
-
-	// Creating AlphaVantage client instance
-	alphaVantage := client.NewAlphaVantage(context.GetSentinelConfig().AlphaVantageKey)
-
-	// Running sentinel
-	executionId, err := sentinel.Run(alphaVantage)
-	if err != nil {
-		logger.Error("Fail to run sentinel",
-			zap.String("sentinelId", sentinel.GetId()),
-			zap.String("executionId", executionId),
-			zap.String("method", "main"),
-			zap.String("error", err.Error()))
-		os.Exit(1)
-	}
-
-	logger.Info("Sentinel have run successfully",
-		zap.String("sentinelId", sentinel.GetId()),
-		zap.String("executionId", executionId),
-		zap.String("method", "main"))
-
-	// Trying to kill sentinel
-	if err := sentinel.Kill(); err != nil {
-		logger.Error("Fail to kill sentinel",
-			zap.String("sentinelId", sentinel.GetId()),
-			zap.String("executionId", executionId),
-			zap.String("error", err.Error()))
-		os.Exit(1)
-	}
-
-	logger.Info("Sentinel have terminated successfully",
-		zap.String("sentinelId", sentinel.GetId()),
-		zap.String("executionId", executionId),
-		zap.String("method", "main"))
 }
 
 func printLogo() {
