@@ -9,14 +9,13 @@ import (
 )
 
 var (
-	sentinelConfig *core.SentinelConfig
-	logger         *zap.Logger
-	err            error
+	context *core.AppContext
+	logger  *zap.Logger
 )
 
 func init() {
 	// Loading sentinel configs
-	sentinelConfig, err = core.NewSentinelConfig()
+	sentinelConfig, err := core.NewSentinelConfig()
 	if err != nil {
 		fmt.Println("Fail to load sentinel config.")
 		os.Exit(1)
@@ -25,6 +24,12 @@ func init() {
 	logger, err = initializeLogger(sentinelConfig)
 	if err != nil {
 		fmt.Printf("It was impossible to load logger. Killing sentinel. Error: %v", err.Error())
+		os.Exit(1)
+	}
+
+	context, err = core.NewAppContext(sentinelConfig)
+	if err != nil {
+		fmt.Println("Fail to initialize sentinel context.")
 		os.Exit(1)
 	}
 }
@@ -53,7 +58,7 @@ func main() {
 	// TODO: replace this hardcoded schedule with something more flexible.
 	var schedule = core.NewSchedule("PETR3.SA", "1min")
 
-	var sentinel, err = core.NewStockSentinel(sentinelConfig, schedule)
+	var sentinel, err = core.NewStockSentinel(context, schedule)
 	if err != nil {
 		logger.Error("Fail to instantiate sentinel",
 			zap.String("sentinelId", sentinel.GetId()),
@@ -63,7 +68,7 @@ func main() {
 	}
 
 	// Creating AlphaVantage client instance
-	alphaVantage := client.NewAlphaVantage(sentinelConfig.AlphaVantageKey)
+	alphaVantage := client.NewAlphaVantage(context.GetSentinelConfig().AlphaVantageKey)
 
 	// Running sentinel
 	executionId, err := sentinel.Run(alphaVantage)

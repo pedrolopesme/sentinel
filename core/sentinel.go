@@ -23,10 +23,9 @@ type Sentinel interface {
 }
 
 type StockSentinel struct {
-	id         string
-	config     *SentinelConfig
-	schedule   *Schedule
-	stocksNats client.NATSServer
+	id       string
+	ctx      Context
+	schedule *Schedule
 }
 
 // GetId returns a unique identifier to the sentinel
@@ -48,7 +47,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 	fmt.Printf("Found %v stocks. Publishing those to stocks queue \n", len(stocks))
 
 	fmt.Println("Connecting to Stocks Queue")
-	var stockNATSClient = s.stocksNats.GetConnection()
+	var stockNATSClient = s.ctx.GetStockNats().GetConnection()
 	fmt.Println("Connected to Stocks Queue")
 
 	defer func() {
@@ -82,21 +81,10 @@ func (s *StockSentinel) Kill() error {
 // NewSentinel
 // TODO add tests
 // TODO add logging
-func NewStockSentinel(config *SentinelConfig, schedule *Schedule) (sentinel *StockSentinel, err error) {
-	clientID, err := uuid.NewV4()
-	if err != nil {
-		fmt.Println("Cant get stocks due to", err.Error())
-	}
-
-	stockNATS, err := client.NewNATSServer(config.NATSStocksClusterID, clientID.String(), config.NATSStocksURI)
-	if err != nil {
-		return nil, err
-	}
-
+func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel, err error) {
 	return &StockSentinel{
-		id:         uuid.Must(uuid.NewV4()).String(),
-		schedule:   schedule,
-		config:     config,
-		stocksNats: stockNATS,
+		id:       uuid.Must(uuid.NewV4()).String(),
+		schedule: schedule,
+		ctx:      ctx,
 	}, nil
 }
