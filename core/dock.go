@@ -1,20 +1,19 @@
 package core
 
 import (
-	"fmt"
 	"github.com/pedrolopesme/sentinel/client"
 	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
-	"os"
 )
 
+// Dock represents a common interface to build all specific dock implementations
 type Dock interface {
 	GetId() string
 	Watch() error
 }
 
 // SentinelDock knows when to launch new sentinels by
-// watching a scheduling queue
+// watching a event stream
 type SentinelDock struct {
 	id  string
 	ctx Context
@@ -32,37 +31,52 @@ func NewSentinelDock(ctx Context) *SentinelDock {
 }
 
 // GetId returns dock id (or execution id, if you prefer)
-func (d *SentinelDock) GetId() string {
-	return d.id
+func (sd *SentinelDock) GetId() string {
+	return sd.id
 }
 
 // Watch observes a queue in order to know when launch new Sentinels
 // TODO add tests
-// TODO add logging
 func (sd *SentinelDock) Watch() (err error) {
-	fmt.Println("Watching... ")
+	var logger = sd.ctx.GetLogger()
+
+	logger.Info("Watching stocks",
+		zap.String("dockId", sd.GetId()),
+		zap.String("method", "main"))
 
 	// Hardcoding a stock to test sentinel
 	// TODO: replace this hardcoded schedule with something more flexible.
 	var schedule = NewSchedule("PETR3.SA", "1min")
-	LaunchSentinel(sd.ctx, schedule)
+
+	if err := LaunchSentinel(sd.id, sd.ctx, schedule); err != nil {
+		logger.Error("Fail to lunch Sentinel",
+			zap.String("dockId", sd.GetId()),
+			zap.String("method", "Watch"),
+			zap.String("error", err.Error()))
+		return err
+	}
+
+	logger.Info("Put have run successfully",
+		zap.String("dockId", sd.GetId()),
+		zap.String("method", "main"))
 
 	return nil
 }
 
+// LaunchSentinel creates and put a Sentinel to check stock price changes
 // TODO remove mocked behaviour
 // TODO add tests
-// TODO improve logging
-func LaunchSentinel(context Context, schedule *Schedule) {
+func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err error) {
 	var logger = context.GetLogger()
 
-	var sentinel, err = NewStockSentinel(context, schedule)
+	sentinel, err := NewStockSentinel(context, schedule)
 	if err != nil {
 		logger.Error("Fail to instantiate sentinel",
+			zap.String("dockId", dockId),
 			zap.String("sentinelId", sentinel.GetId()),
-			zap.String("method", "main"),
+			zap.String("method", "LaunchSentinel"),
 			zap.String("error", err.Error()))
-		os.Exit(1)
+		return err
 	}
 
 	// Creating AlphaVantage client instance
@@ -72,29 +86,36 @@ func LaunchSentinel(context Context, schedule *Schedule) {
 	executionId, err := sentinel.Run(alphaVantage)
 	if err != nil {
 		logger.Error("Fail to run sentinel",
+			zap.String("dockId", dockId),
 			zap.String("sentinelId", sentinel.GetId()),
 			zap.String("executionId", executionId),
-			zap.String("method", "main"),
+			zap.String("method", "LaunchSentinel"),
 			zap.String("error", err.Error()))
-		os.Exit(1)
+		return err
 	}
 
 	logger.Info("Sentinel have run successfully",
+		zap.String("dockId", dockId),
 		zap.String("sentinelId", sentinel.GetId()),
 		zap.String("executionId", executionId),
-		zap.String("method", "main"))
+		zap.String("method", "LaunchSentinel"))
 
 	// Trying to kill sentinel
 	if err := sentinel.Kill(); err != nil {
 		logger.Error("Fail to kill sentinel",
+			zap.String("dockId", dockId),
 			zap.String("sentinelId", sentinel.GetId()),
 			zap.String("executionId", executionId),
+			zap.String("method", "LaunchSentinel"),
 			zap.String("error", err.Error()))
-		os.Exit(1)
+		return err
 	}
 
 	logger.Info("Sentinel have terminated successfully",
+		zap.String("dockId", dockId),
 		zap.String("sentinelId", sentinel.GetId()),
 		zap.String("executionId", executionId),
-		zap.String("method", "main"))
+		zap.String("method", "LaunchSentinel"))
+
+	return nil
 }
