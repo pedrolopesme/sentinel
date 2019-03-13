@@ -3,26 +3,37 @@ package core
 import (
 	"fmt"
 	"github.com/pedrolopesme/sentinel/client"
+	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 	"os"
 )
 
 type Dock interface {
+	GetId() string
 	Watch() error
 }
 
 // SentinelDock knows when to launch new sentinels by
 // watching a scheduling queue
 type SentinelDock struct {
+	id  string
 	ctx Context
 }
 
 // NewSentinelDock provides a working SentinelDock to a given app context
 // TODO add tests
 func NewSentinelDock(ctx Context) *SentinelDock {
+	var executionId = uuid.Must(uuid.NewV4()).String()
+
 	return &SentinelDock{
+		id:  executionId,
 		ctx: ctx,
 	}
+}
+
+// GetId returns dock id (or execution id, if you prefer)
+func (d *SentinelDock) GetId() string {
+	return d.id
 }
 
 // Watch observes a queue in order to know when launch new Sentinels

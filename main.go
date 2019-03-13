@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/pedrolopesme/sentinel/core"
+	"go.uber.org/zap"
 	"os"
 )
 
@@ -14,13 +15,14 @@ func init() {
 	// Loading sentinel configs
 	sentinelConfig, err := core.NewSentinelConfig()
 	if err != nil {
-		fmt.Println("Fail to load sentinel config.")
+		fmt.Printf("Fail to load sentinel config. Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 
+	// Loading application context.
 	context, err = core.NewAppContext(sentinelConfig)
 	if err != nil {
-		fmt.Println("Fail to initialize sentinel context.")
+		fmt.Printf("Fail to initialize sentinel context. Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 }
@@ -28,7 +30,7 @@ func init() {
 // final runs when the Sentinel terminates
 func final() {
 	if err := context.GetLogger().Sync(); err != nil {
-		fmt.Println("It was impossible to flush the logger")
+		fmt.Printf("It was impossible to flush the logger. Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 }
@@ -39,7 +41,11 @@ func main() {
 
 	var sentinelDock = core.NewSentinelDock(context)
 	if err := sentinelDock.Watch(); err != nil {
-		fmt.Println("It was impossible to watch new Stocks")
+		context.GetLogger().Error("Fail to put SentinelDock to watch stocks",
+			zap.String("dockId", sentinelDock.GetId()),
+			zap.String("method", "main"),
+			zap.String("error", err.Error()),
+		)
 		os.Exit(1)
 	}
 }
