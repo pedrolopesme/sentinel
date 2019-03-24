@@ -40,6 +40,11 @@ func (a *AlphaVantage) GetStocks(stock string, timeFrame string) (map[time.Time]
 	return parseStocksCSV(body)
 }
 
+// GetName returns stock provider name
+func (a *AlphaVantage) GetName() string {
+	return "AlphaVantage"
+}
+
 func buildURL(stock string, timeFrame string, key string) string {
 	return fmt.Sprintf(URL, stock, timeFrame, key)
 }
