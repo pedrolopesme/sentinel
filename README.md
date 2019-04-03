@@ -5,6 +5,13 @@
 
 A Golang utility for crawling historical stocks data.
 
+<p align="center">
+  <a href="https://travis-ci.org/pedrolopesme/sentinel"> <img src="https://api.travis-ci.org/pedrolopesme/sentinel.svg?branch=master" /></a>
+  <a href="https://goreportcard.com/report/github.com/pedrolopesme/sentinel"> <img src="https://goreportcard.com/badge/github.com/pedrolopesme/sentinel" /></a>
+  <a href="https://codeclimate.com/github/pedrolopesme/sentinel/maintainability"> <img src="https://api.codeclimate.com/v1/badges/b7cee6500978112b2910/maintainability" /></a>
+</p>
+<br>
+
 #### Executing
  
  This project comes with a useful [Makefile](Makefile) containing all needed targets to build, run docker containers, 
