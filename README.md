@@ -9,6 +9,9 @@ A Golang utility for crawling historical stocks data.
   <a href="https://travis-ci.org/pedrolopesme/sentinel"> <img src="https://api.travis-ci.org/pedrolopesme/sentinel.svg?branch=master" /></a>
   <a href="https://goreportcard.com/report/github.com/pedrolopesme/sentinel"> <img src="https://goreportcard.com/badge/github.com/pedrolopesme/sentinel" /></a>
   <a href="https://codeclimate.com/github/pedrolopesme/sentinel/maintainability"> <img src="https://api.codeclimate.com/v1/badges/b7cee6500978112b2910/maintainability" /></a>
+  <a href="https://sonarcloud.io/dashboard?id=pedrolopesme_sentinel"> <img src="https://sonarcloud.io/api/project_badges/measure?project=pedrolopesme_sentinel&metric=alert_status" /></a>
+  <a href="https://sonarcloud.io/dashboard?id=pedrolopesme_sentinel"> <img src="https://sonarcloud.io/api/project_badges/measure?project=pedrolopesme_sentinel&metric=alert_status" /></a>
+  <a href="https://sonarcloud.io/dashboard?id=pedrolopesme_sentinel"> <img src="https://sonarcloud.io/api/project_badges/measure?project=pedrolopesme_sentinel&metric=coverage" /></a>
 </p>
 <br>
 
