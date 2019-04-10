@@ -2,8 +2,13 @@ package core
 
 import (
 	assert2 "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"testing"
 )
+
+type MockSchedule struct {
+	mock.Mock
+}
 
 func TestNewScheduleShouldReturnAProperSchedule(t *testing.T) {
 	var (
