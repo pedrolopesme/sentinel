@@ -13,7 +13,7 @@ const (
 )
 
 type Sentinel interface {
-	// GetId returns a unique identifier to the sentinel
+	// GetId returns an unique identifier to the sentinel
 	GetId() string
 
 	// Run puts sentinel to run and returns its execution Id and an error
@@ -129,7 +129,7 @@ func (s *StockSentinel) Kill() error {
 	return nil
 }
 
-// NewSentinel
+// NewSentinel is a base Sentinel build
 // TODO add tests
 func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel, err error) {
 	sentinel = &StockSentinel{

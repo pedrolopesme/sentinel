@@ -21,6 +21,29 @@ type AppContext struct {
 	logger          *zap.Logger
 }
 
+// GetSentinelConfig returns Sentinel config
+func (ac *AppContext) GetSentinelConfig() *SentinelConfig {
+	return ac.sentinelConfig
+}
+
+// GetStockNats returns Nats server connection
+func (ac *AppContext) GetStockNats() client.NATSServer {
+	return ac.stockNatsServer
+}
+
+// GetLogger returns application default logger
+func (ac *AppContext) GetLogger() *zap.Logger {
+	return ac.logger
+}
+
+func initializeLogger(config *SentinelConfig) (*zap.Logger, error) {
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{
+		fmt.Sprintf("%v/sentinels.log", config.LogsPath),
+	}
+	return cfg.Build()
+}
+
 // NewAppContext knows how to instantiate Sentinels General Context
 // TODO add some logging
 // TODO add tests
@@ -46,27 +69,4 @@ func NewAppContext(config *SentinelConfig) (ctx *AppContext, err error) {
 		sentinelConfig:  config,
 		logger:          logger,
 	}, nil
-}
-
-// GetSentinelConfig returns Sentinel config
-func (ac *AppContext) GetSentinelConfig() *SentinelConfig {
-	return ac.sentinelConfig
-}
-
-// GetStockNats returns Nats server connection
-func (ac *AppContext) GetStockNats() client.NATSServer {
-	return ac.stockNatsServer
-}
-
-// GetLogger returns application default logger
-func (ac *AppContext) GetLogger() *zap.Logger {
-	return ac.logger
-}
-
-func initializeLogger(config *SentinelConfig) (*zap.Logger, error) {
-	cfg := zap.NewProductionConfig()
-	cfg.OutputPaths = []string{
-		fmt.Sprintf("%v/sentinels.log", config.LogsPath),
-	}
-	return cfg.Build()
 }
