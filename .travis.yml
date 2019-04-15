@@ -1,0 +1,25 @@
+language: go
+
+go:
+  - "1.10.x"
+  - "1.11.x"
+  - "1.12.x"
+  - master
+
+addons:
+  sonarcloud:
+    organization: "pedrolopesme-github"
+
+install:
+  - go get -u gopkg.in/alecthomas/gometalinter.v2
+  - $GOPATH/bin/gometalinter.v2 --install
+
+script:
+  - $GOPATH/bin/gometalinter.v2 samples/ > gometalinter-report.out || true
+  - go test -json -v ./... > report.json
+  - go test -coverprofile=coverage.out -v ./...
+  - sonar-scanner
+
+cache:
+  directories:
+    - '$HOME/.sonar/cache'

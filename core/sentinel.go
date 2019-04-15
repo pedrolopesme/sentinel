@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"github.com/pedrolopesme/sentinel/client"
 	"github.com/satori/go.uuid"
-	"os"
+	"go.uber.org/zap"
+	"time"
 )
 
 const (
@@ -12,7 +13,7 @@ const (
 )
 
 type Sentinel interface {
-	// GetId returns a unique identifier to the sentinel
+	// GetId returns an unique identifier to the sentinel
 	GetId() string
 
 	// Run puts sentinel to run and returns its execution Id and an error
@@ -23,10 +24,9 @@ type Sentinel interface {
 }
 
 type StockSentinel struct {
-	id         string
-	config     *SentinelConfig
-	schedule   *Schedule
-	stocksNats client.NATSServer
+	id       string
+	ctx      Context
+	schedule *Schedule
 }
 
 // GetId returns a unique identifier to the sentinel
@@ -36,27 +36,87 @@ func (s *StockSentinel) GetId() string {
 
 // GetId returns a unique identifier to the sentinel
 // TODO add tests
-// TODO add log
 func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
-	var executionId = uuid.Must(uuid.NewV4()).String()
-	fmt.Println("Running StockSentinel ", s.GetId(), " - execution ", executionId)
+	var (
+		logger      = s.ctx.GetLogger()
+		executionId = uuid.Must(uuid.NewV4()).String()
+	)
+
+	logger.Info("Running StockSentinel",
+		zap.String("sentinelId", s.GetId()),
+		zap.String("executionId", executionId))
 
 	stocks, err := stockProvider.GetStocks(s.schedule.Stock, s.schedule.TimeFrame)
 	if err != nil {
-		fmt.Println("Cant get stocks due to", err.Error())
+		logger.Error("Cant get stocks",
+			zap.String("sentinelId", s.GetId()),
+			zap.String("executionId", executionId),
+			zap.String("provider", stockProvider.GetName()),
+			zap.String("error", err.Error()))
 	}
+
+	logger.Info(fmt.Sprintf("Found %v stocks. Publishing them to stocks queue", len(stocks)),
+		zap.String("sentinelId", s.GetId()),
+		zap.String("provider", stockProvider.GetName()),
+		zap.String("executionId", executionId))
+
+	logger.Info("Connecting to Stocks Queue",
+		zap.String("sentinelId", s.GetId()),
+		zap.String("executionId", executionId))
+	beforeConnect := time.Now()
+	var stockNATSClient = s.ctx.GetStockNats().GetConnection()
+	logger.Info("Connected to Stocks Queue",
+		zap.String("sentinelId", s.GetId()),
+		zap.String("millisecondsSpent", time.Since(beforeConnect).String()),
+		zap.String("executionId", executionId))
+
+	defer func() {
+		logger.Info("Disconnecting from Stocks Queue",
+			zap.String("sentinelId", s.GetId()),
+			zap.String("executionId", executionId))
+		before := time.Now()
+		if err := stockNATSClient.Close(); err != nil {
+			logger.Error("Error to disconnect from Stocks Queue",
+				zap.String("sentinelId", s.GetId()),
+				zap.String("millisecondsSpent", time.Since(before).String()),
+				zap.String("executionId", executionId),
+				zap.String("error", err.Error()))
+		} else {
+			logger.Info("Disconnected from Stocks Queue",
+				zap.String("sentinelId", s.GetId()),
+				zap.String("millisecondsSpent", time.Since(before).String()),
+				zap.String("executionId", executionId))
+		}
+	}()
 
 	// TODO extract it somewhere else
 	// TODO add tests
 	// TODO what if publish fails? What about a retry logic?
 	// TODO format message properly
-	var stockNATSClient = s.stocksNats.GetConnection()
-	defer stockNATSClient.Close()
-	for k, y := range stocks {
-		stock := fmt.Sprint(k, ">>>", y.Price.High)
-		if err = stockNATSClient.Publish(NATS_STOCKS_SUBJECT, []byte(stock)); err != nil {
-			fmt.Println("Cant public stocks to queue due to", err.Error())
-			os.Exit(1)
+	for timeFrame, stock := range stocks {
+		logger.Info("Publishing stock",
+			zap.String("sentinelId", s.GetId()),
+			zap.String("stock", s.schedule.Stock),
+			zap.String("timeFrame", timeFrame.String()),
+			zap.String("executionId", executionId))
+
+		payload := fmt.Sprint(timeFrame, ">>>", stock.Price.High)
+		before := time.Now()
+		if err = stockNATSClient.Publish(NATS_STOCKS_SUBJECT, []byte(payload)); err != nil {
+			logger.Error("Impossible to publish stock",
+				zap.String("sentinelId", s.GetId()),
+				zap.String("stock", s.schedule.Stock),
+				zap.String("timeFrame", timeFrame.String()),
+				zap.String("millisecondsSpend", time.Since(before).String()),
+				zap.String("executionId", executionId),
+				zap.String("error", err.Error()))
+		} else {
+			logger.Info("Stock published",
+				zap.String("sentinelId", s.GetId()),
+				zap.String("stock", s.schedule.Stock),
+				zap.String("timeFrame", timeFrame.String()),
+				zap.String("millisecondsSpend", time.Since(before).String()),
+				zap.String("executionId", executionId))
 		}
 	}
 
@@ -69,24 +129,15 @@ func (s *StockSentinel) Kill() error {
 	return nil
 }
 
-// NewSentinel
+// NewSentinel is a base Sentinel build
 // TODO add tests
-// TODO add logging
-func NewStockSentinel(config *SentinelConfig, schedule *Schedule) (sentinel *StockSentinel, err error) {
-	clientID, err := uuid.NewV4()
-	if err != nil {
-		fmt.Println("Cant get stocks due to", err.Error())
+func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel, err error) {
+	sentinel = &StockSentinel{
+		id:       uuid.Must(uuid.NewV4()).String(),
+		schedule: schedule,
+		ctx:      ctx,
 	}
 
-	stockNATS, err := client.NewNATSServer(config.NATSStocksClusterID, clientID.String(), config.NATSStocksURI)
-	if err != nil {
-		return nil, err
-	}
-
-	return &StockSentinel{
-		id:         uuid.Must(uuid.NewV4()).String(),
-		schedule:   schedule,
-		config:     config,
-		stocksNats: stockNATS,
-	}, nil
+	ctx.GetLogger().Info("Sentinel created", zap.String("sentinelId", sentinel.GetId()))
+	return
 }
