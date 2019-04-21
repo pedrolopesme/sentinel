@@ -24,7 +24,7 @@ type Sentinel interface {
 }
 
 type StockSentinel struct {
-	id       string
+	id        string
 	ctx      Context
 	schedule *Schedule
 }
@@ -38,7 +38,7 @@ func (s *StockSentinel) GetId() string {
 // TODO add tests
 func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
 	var (
-		logger      = s.ctx.GetLogger()
+		logger      = s.ctx.Logger()
 		executionId = uuid.Must(uuid.NewV4()).String()
 	)
 
@@ -64,7 +64,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 		zap.String("sentinelId", s.GetId()),
 		zap.String("executionId", executionId))
 	beforeConnect := time.Now()
-	var stockNATSClient = s.ctx.GetStockNats().GetConnection()
+	var stockNATSClient = s.ctx.StockNats().GetConnection()
 	logger.Info("Connected to Stocks Queue",
 		zap.String("sentinelId", s.GetId()),
 		zap.String("millisecondsSpent", time.Since(beforeConnect).String()),
@@ -138,6 +138,8 @@ func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel,
 		ctx:      ctx,
 	}
 
-	ctx.GetLogger().Info("Sentinel created", zap.String("sentinelId", sentinel.GetId()))
+	fmt.Printf("%T", ctx.Logger())
+
+	//ctx.Logger().Info("Sentinel created", zap.String("sentinelId", sentinel.GetId()))
 	return
 }

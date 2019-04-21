@@ -9,9 +9,9 @@ import (
 )
 
 type Context interface {
-	GetSentinelConfig() *SentinelConfig
-	GetStockNats() client.NATSServer
-	GetLogger() *zap.Logger
+	SentinelConfig() *SentinelConfig
+	StockNats() client.NATSServer
+	Logger() *zap.Logger
 }
 
 // AppContext represents a general context for the application
@@ -21,18 +21,18 @@ type AppContext struct {
 	logger          *zap.Logger
 }
 
-// GetSentinelConfig returns Sentinel config
-func (ac *AppContext) GetSentinelConfig() *SentinelConfig {
+// SentinelConfig returns Sentinel config
+	func (ac *AppContext) SentinelConfig() *SentinelConfig {
 	return ac.sentinelConfig
 }
 
-// GetStockNats returns Nats server connection
-func (ac *AppContext) GetStockNats() client.NATSServer {
+// StockNats returns Nats server connection
+func (ac *AppContext) StockNats() client.NATSServer {
 	return ac.stockNatsServer
 }
 
-// GetLogger returns application default logger
-func (ac *AppContext) GetLogger() *zap.Logger {
+// Logger returns application default logger
+func (ac *AppContext) Logger() *zap.Logger {
 	return ac.logger
 }
 

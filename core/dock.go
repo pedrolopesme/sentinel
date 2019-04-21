@@ -38,7 +38,7 @@ func (sd *SentinelDock) GetId() string {
 // Watch observes a queue in order to know when launch new Sentinels
 // TODO add tests
 func (sd *SentinelDock) Watch() (err error) {
-	var logger = sd.ctx.GetLogger()
+	var logger = sd.ctx.Logger()
 
 	logger.Info("Watching stocks",
 		zap.String("dockId", sd.GetId()),
@@ -67,7 +67,7 @@ func (sd *SentinelDock) Watch() (err error) {
 // TODO remove mocked behaviour
 // TODO add tests
 func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err error) {
-	var logger = context.GetLogger()
+	var logger = context.Logger()
 
 	sentinel, err := NewStockSentinel(context, schedule)
 	if err != nil {
@@ -80,7 +80,7 @@ func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err err
 	}
 
 	// Creating AlphaVantage client instance
-	alphaVantage := client.NewAlphaVantage(context.GetSentinelConfig().AlphaVantageKey)
+	alphaVantage := client.NewAlphaVantage(context.SentinelConfig().AlphaVantageKey)
 
 	// Running sentinel
 	executionId, err := sentinel.Run(alphaVantage)

@@ -4,6 +4,7 @@ import (
 	"github.com/pedrolopesme/sentinel/client"
 	assert2 "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
 	"testing"
 )
 
@@ -28,14 +29,16 @@ func (ms *MockedSentinel) Kill() error {
 
 func TestNewSentinelShouldReturnASentinelWithAUniqueId(t *testing.T) {
 	var (
-		assert   = assert2.New(t)
-		schedule = NewSchedule("foo", "bar")
-		config   = SentinelConfig{}
-		ctx, _   = NewAppContext(&config)
+		assert        = assert2.New(t)
+		schedule      = NewSchedule("foo", "bar")
+		mockedContext = MockedContext{}
 	)
 
-	firstSentinel, _ := NewStockSentinel(ctx, schedule)
-	secondSentinel, _ := NewStockSentinel(ctx, schedule)
+	logger := zap.NewNop()
+	mockedContext.On("Logger").Return(logger)
+
+	firstSentinel, _ := NewStockSentinel(mockedContext, schedule)
+	secondSentinel, _ := NewStockSentinel(mockedContext, schedule)
 	assert.NotNil(firstSentinel)
 	assert.NotNil(secondSentinel)
 	assert.NotEqual(firstSentinel.id, secondSentinel.id)

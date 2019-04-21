@@ -29,7 +29,7 @@ func init() {
 
 // final runs when the Sentinel terminates
 func final() {
-	if err := context.GetLogger().Sync(); err != nil {
+	if err := context.Logger().Sync(); err != nil {
 		fmt.Printf("It was impossible to flush the logger. Error: %v\n", err.Error())
 		os.Exit(1)
 	}
@@ -41,7 +41,7 @@ func main() {
 
 	var sentinelDock = core.NewSentinelDock(context)
 	if err := sentinelDock.Watch(); err != nil {
-		context.GetLogger().Error("Fail to put SentinelDock to watch stocks",
+		context.Logger().Error("Fail to put SentinelDock to watch stocks",
 			zap.String("dockId", sentinelDock.GetId()),
 			zap.String("method", "main"),
 			zap.String("error", err.Error()),
