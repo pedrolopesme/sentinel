@@ -2,10 +2,13 @@ package core
 
 import (
 	"fmt"
-	"github.com/pedrolopesme/sentinel/client"
-	"github.com/satori/go.uuid"
-	"go.uber.org/zap"
 	"time"
+
+	stan "github.com/nats-io/go-nats-streaming"
+	"github.com/pedrolopesme/sentinel/client"
+	"github.com/pedrolopesme/sentinel/models"
+	uuid "github.com/satori/go.uuid"
+	"go.uber.org/zap"
 )
 
 const (
@@ -18,15 +21,13 @@ type Sentinel interface {
 
 	// Run puts sentinel to run and returns its execution Id and an error
 	Run(stockProvider client.StockProvider) (string, error)
-
-	// Kill stops a Sentinel
-	Kill() error
 }
 
 type StockSentinel struct {
-	id        string
+	id       string
 	ctx      Context
 	schedule *Schedule
+	natsConn stan.Conn
 }
 
 // GetId returns a unique identifier to the sentinel
@@ -38,8 +39,8 @@ func (s *StockSentinel) GetId() string {
 // TODO add tests
 func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
 	var (
-		logger      = s.ctx.Logger()
 		executionId = uuid.Must(uuid.NewV4()).String()
+		logger      = s.ctx.Logger()
 	)
 
 	logger.Info("Running StockSentinel",
@@ -53,43 +54,32 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 			zap.String("executionId", executionId),
 			zap.String("provider", stockProvider.GetName()),
 			zap.String("error", err.Error()))
+		return "", err
 	}
+
+	if err := s.publishStocks(executionId, stockProvider, stocks); err != nil {
+		logger.Error("Cant publish stocks",
+			zap.String("sentinelId", s.GetId()),
+			zap.String("executionId", executionId),
+			zap.String("provider", stockProvider.GetName()),
+			zap.String("error", err.Error()))
+		return "", err
+	}
+
+	return executionId, nil
+}
+
+func (s *StockSentinel) publishStocks(executionId string, stockProvider client.StockProvider, stocks map[time.Time]models.StockTier) (err error) {
+	var (
+		logger          = s.ctx.Logger()
+		stockNATSClient = s.ctx.StockNats().GetConnection()
+	)
 
 	logger.Info(fmt.Sprintf("Found %v stocks. Publishing them to stocks queue", len(stocks)),
 		zap.String("sentinelId", s.GetId()),
 		zap.String("provider", stockProvider.GetName()),
 		zap.String("executionId", executionId))
 
-	logger.Info("Connecting to Stocks Queue",
-		zap.String("sentinelId", s.GetId()),
-		zap.String("executionId", executionId))
-	beforeConnect := time.Now()
-	var stockNATSClient = s.ctx.StockNats().GetConnection()
-	logger.Info("Connected to Stocks Queue",
-		zap.String("sentinelId", s.GetId()),
-		zap.String("millisecondsSpent", time.Since(beforeConnect).String()),
-		zap.String("executionId", executionId))
-
-	defer func() {
-		logger.Info("Disconnecting from Stocks Queue",
-			zap.String("sentinelId", s.GetId()),
-			zap.String("executionId", executionId))
-		before := time.Now()
-		if err := stockNATSClient.Close(); err != nil {
-			logger.Error("Error to disconnect from Stocks Queue",
-				zap.String("sentinelId", s.GetId()),
-				zap.String("millisecondsSpent", time.Since(before).String()),
-				zap.String("executionId", executionId),
-				zap.String("error", err.Error()))
-		} else {
-			logger.Info("Disconnected from Stocks Queue",
-				zap.String("sentinelId", s.GetId()),
-				zap.String("millisecondsSpent", time.Since(before).String()),
-				zap.String("executionId", executionId))
-		}
-	}()
-
-	// TODO extract it somewhere else
 	// TODO add tests
 	// TODO what if publish fails? What about a retry logic?
 	// TODO format message properly
@@ -120,17 +110,10 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 		}
 	}
 
-	return executionId, nil
-}
-
-// Kill stops a Sentinel
-// TODO add tests
-func (s *StockSentinel) Kill() error {
-	return nil
+	return
 }
 
 // NewSentinel is a base Sentinel build
-// TODO add tests
 func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel, err error) {
 	sentinel = &StockSentinel{
 		id:       uuid.Must(uuid.NewV4()).String(),
@@ -138,8 +121,6 @@ func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel,
 		ctx:      ctx,
 	}
 
-	fmt.Printf("%T", ctx.Logger())
-
-	//ctx.Logger().Info("Sentinel created", zap.String("sentinelId", sentinel.GetId()))
+	ctx.Logger().Info("Sentinel created", zap.String("sentinelId", sentinel.GetId()))
 	return
 }

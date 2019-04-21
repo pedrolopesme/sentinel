@@ -100,17 +100,6 @@ func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err err
 		zap.String("executionId", executionId),
 		zap.String("method", "LaunchSentinel"))
 
-	// Trying to kill sentinel
-	if err := sentinel.Kill(); err != nil {
-		logger.Error("Fail to kill sentinel",
-			zap.String("dockId", dockId),
-			zap.String("sentinelId", sentinel.GetId()),
-			zap.String("executionId", executionId),
-			zap.String("method", "LaunchSentinel"),
-			zap.String("error", err.Error()))
-		return err
-	}
-
 	logger.Info("Sentinel have terminated successfully",
 		zap.String("dockId", dockId),
 		zap.String("sentinelId", sentinel.GetId()),

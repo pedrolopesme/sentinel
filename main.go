@@ -35,6 +35,7 @@ func final() {
 	}
 }
 
+// TODO release nats connection
 func main() {
 	defer final()
 	printLogo()
