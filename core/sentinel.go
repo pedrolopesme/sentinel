@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	stan "github.com/nats-io/go-nats-streaming"
+	"github.com/nats-io/go-nats-streaming"
 	"github.com/pedrolopesme/sentinel/client"
 	"github.com/pedrolopesme/sentinel/models"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
 
@@ -36,7 +36,6 @@ func (s *StockSentinel) Id() string {
 }
 
 // Id returns a unique identifier to the sentinel
-// TODO add tests
 func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
 	var (
 		executionId = uuid.Must(uuid.NewV4()).String()
@@ -69,6 +68,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 	return executionId, nil
 }
 
+// TODO extract to its own structure. Is "Stocks Publisher" a good name?
 func (s *StockSentinel) publishStocks(executionId string, stockProvider client.StockProvider, stocks map[time.Time]models.StockTier) (err error) {
 	var (
 		logger          = s.ctx.Logger()
@@ -83,6 +83,7 @@ func (s *StockSentinel) publishStocks(executionId string, stockProvider client.S
 	// TODO add tests
 	// TODO what if publish fails? What about a retry logic?
 	// TODO format message properly
+	// Why not goroutines instead of a linear publishing?
 	for timeFrame, stock := range stocks {
 		logger.Info("Publishing stock",
 			zap.String("sentinelId", s.Id()),

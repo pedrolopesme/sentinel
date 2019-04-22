@@ -20,6 +20,13 @@ func (ms *MockedSentinel) Run(stockProvider client.StockProvider) (string, error
 	return args.String(0), args.Error(1)
 }
 
+func TestSentinelShouldReturnItsId(t *testing.T) {
+	setup(t)
+	dummyId := "some-dummyId"
+	sentinel := StockSentinel{id: dummyId}
+	assert.Equal(dummyId, sentinel.Id())
+}
+
 func TestNewSentinelShouldReturnASentinelWithAUniqueId(t *testing.T) {
 	var (
 		schedule = NewSchedule("foo", "bar")
@@ -34,9 +41,22 @@ func TestNewSentinelShouldReturnASentinelWithAUniqueId(t *testing.T) {
 	assert.NotEqual(firstSentinel.id, secondSentinel.id)
 }
 
-func TestSentinelShouldReturnItsId(t *testing.T) {
+func TestSentinelsShouldStopProperlyWhenAErrorOccurWhileGettingStocks(t *testing.T) {
 	setup(t)
-	dummyId := "some-dummyId"
-	sentinel := StockSentinel{id: dummyId}
-	assert.Equal(dummyId, sentinel.Id())
+	assert.True(false)
+}
+
+func TestSentinelsShouldStopProperlyWhenNoStocksWereFoundButNoErrorWereReturned(t *testing.T) {
+	setup(t)
+	assert.True(false)
+}
+
+func TestSentinelsShouldStopProperlyWhenItWasImpossibleToPublishStocks(t *testing.T) {
+	setup(t)
+	assert.True(false)
+}
+
+func TestSentinelsShouldReturnItsExecutionAndNoErrosWhenItHasRunSuccessfully(t *testing.T) {
+	setup(t)
+	assert.True(false)
 }
