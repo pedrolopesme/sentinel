@@ -22,7 +22,7 @@ type AppContext struct {
 }
 
 // SentinelConfig returns Sentinel config
-	func (ac *AppContext) SentinelConfig() *SentinelConfig {
+func (ac *AppContext) SentinelConfig() *SentinelConfig {
 	return ac.sentinelConfig
 }
 

@@ -22,5 +22,5 @@ func (mc MockedContext) StockNats() client.NATSServer {
 
 func (mc MockedContext) Logger() *zap.Logger {
 	args := mc.Called()
-	return  args.Get(0).(*zap.Logger)
+	return args.Get(0).(*zap.Logger)
 }
