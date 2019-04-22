@@ -73,7 +73,7 @@ func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err err
 	if err != nil {
 		logger.Error("Fail to instantiate sentinel",
 			zap.String("dockId", dockId),
-			zap.String("sentinelId", sentinel.GetId()),
+			zap.String("sentinelId", sentinel.Id()),
 			zap.String("method", "LaunchSentinel"),
 			zap.String("error", err.Error()))
 		return err
@@ -87,7 +87,7 @@ func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err err
 	if err != nil {
 		logger.Error("Fail to run sentinel",
 			zap.String("dockId", dockId),
-			zap.String("sentinelId", sentinel.GetId()),
+			zap.String("sentinelId", sentinel.Id()),
 			zap.String("executionId", executionId),
 			zap.String("method", "LaunchSentinel"),
 			zap.String("error", err.Error()))
@@ -96,13 +96,13 @@ func LaunchSentinel(dockId string, context Context, schedule *Schedule) (err err
 
 	logger.Info("Sentinel have run successfully",
 		zap.String("dockId", dockId),
-		zap.String("sentinelId", sentinel.GetId()),
+		zap.String("sentinelId", sentinel.Id()),
 		zap.String("executionId", executionId),
 		zap.String("method", "LaunchSentinel"))
 
 	logger.Info("Sentinel have terminated successfully",
 		zap.String("dockId", dockId),
-		zap.String("sentinelId", sentinel.GetId()),
+		zap.String("sentinelId", sentinel.Id()),
 		zap.String("executionId", executionId),
 		zap.String("method", "LaunchSentinel"))
 

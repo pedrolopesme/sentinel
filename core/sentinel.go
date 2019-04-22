@@ -31,7 +31,7 @@ type StockSentinel struct {
 }
 
 // Id returns a unique identifier to the sentinel
-func (s *StockSentinel) GetId() string {
+func (s *StockSentinel) Id() string {
 	return s.id
 }
 
@@ -44,13 +44,13 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 	)
 
 	logger.Info("Running StockSentinel",
-		zap.String("sentinelId", s.GetId()),
+		zap.String("sentinelId", s.Id()),
 		zap.String("executionId", executionId))
 
 	stocks, err := stockProvider.GetStocks(s.schedule.Stock, s.schedule.TimeFrame)
 	if err != nil {
 		logger.Error("Cant get stocks",
-			zap.String("sentinelId", s.GetId()),
+			zap.String("sentinelId", s.Id()),
 			zap.String("executionId", executionId),
 			zap.String("provider", stockProvider.GetName()),
 			zap.String("error", err.Error()))
@@ -59,7 +59,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 
 	if err := s.publishStocks(executionId, stockProvider, stocks); err != nil {
 		logger.Error("Cant publish stocks",
-			zap.String("sentinelId", s.GetId()),
+			zap.String("sentinelId", s.Id()),
 			zap.String("executionId", executionId),
 			zap.String("provider", stockProvider.GetName()),
 			zap.String("error", err.Error()))
@@ -76,7 +76,7 @@ func (s *StockSentinel) publishStocks(executionId string, stockProvider client.S
 	)
 
 	logger.Info(fmt.Sprintf("Found %v stocks. Publishing them to stocks queue", len(stocks)),
-		zap.String("sentinelId", s.GetId()),
+		zap.String("sentinelId", s.Id()),
 		zap.String("provider", stockProvider.GetName()),
 		zap.String("executionId", executionId))
 
@@ -85,7 +85,7 @@ func (s *StockSentinel) publishStocks(executionId string, stockProvider client.S
 	// TODO format message properly
 	for timeFrame, stock := range stocks {
 		logger.Info("Publishing stock",
-			zap.String("sentinelId", s.GetId()),
+			zap.String("sentinelId", s.Id()),
 			zap.String("stock", s.schedule.Stock),
 			zap.String("timeFrame", timeFrame.String()),
 			zap.String("executionId", executionId))
@@ -94,7 +94,7 @@ func (s *StockSentinel) publishStocks(executionId string, stockProvider client.S
 		before := time.Now()
 		if err = stockNATSClient.Publish(NATS_STOCKS_SUBJECT, []byte(payload)); err != nil {
 			logger.Error("Impossible to publish stock",
-				zap.String("sentinelId", s.GetId()),
+				zap.String("sentinelId", s.Id()),
 				zap.String("stock", s.schedule.Stock),
 				zap.String("timeFrame", timeFrame.String()),
 				zap.String("millisecondsSpend", time.Since(before).String()),
@@ -102,7 +102,7 @@ func (s *StockSentinel) publishStocks(executionId string, stockProvider client.S
 				zap.String("error", err.Error()))
 		} else {
 			logger.Info("Stock published",
-				zap.String("sentinelId", s.GetId()),
+				zap.String("sentinelId", s.Id()),
 				zap.String("stock", s.schedule.Stock),
 				zap.String("timeFrame", timeFrame.String()),
 				zap.String("millisecondsSpend", time.Since(before).String()),
@@ -121,6 +121,6 @@ func NewStockSentinel(ctx Context, schedule *Schedule) (sentinel *StockSentinel,
 		ctx:      ctx,
 	}
 
-	ctx.Logger().Info("Sentinel created", zap.String("sentinelId", sentinel.GetId()))
+	ctx.Logger().Info("Sentinel created", zap.String("sentinelId", sentinel.Id()))
 	return
 }

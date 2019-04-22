@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-type MockSchedule struct {
+type MockedSchedule struct {
 	mock.Mock
 }
 
