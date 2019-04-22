@@ -16,8 +16,8 @@ const (
 )
 
 type Sentinel interface {
-	// GetId returns an unique identifier to the sentinel
-	GetId() string
+	// Id returns an unique identifier to the sentinel
+	Id() string
 
 	// Run puts sentinel to run and returns its execution Id and an error
 	Run(stockProvider client.StockProvider) (string, error)
@@ -30,12 +30,12 @@ type StockSentinel struct {
 	natsConn stan.Conn
 }
 
-// GetId returns a unique identifier to the sentinel
+// Id returns a unique identifier to the sentinel
 func (s *StockSentinel) GetId() string {
 	return s.id
 }
 
-// GetId returns a unique identifier to the sentinel
+// Id returns a unique identifier to the sentinel
 // TODO add tests
 func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) {
 	var (

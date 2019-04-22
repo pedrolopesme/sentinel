@@ -30,7 +30,7 @@ func NewSentinelDock(ctx Context) *SentinelDock {
 	}
 }
 
-// GetId returns dock id (or execution id, if you prefer)
+// Id returns dock id (or execution id, if you prefer)
 func (sd *SentinelDock) GetId() string {
 	return sd.id
 }
