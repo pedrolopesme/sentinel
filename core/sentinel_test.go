@@ -2,7 +2,6 @@ package core
 
 import (
 	"github.com/pedrolopesme/sentinel/client"
-	assert2 "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"testing"
 )
@@ -11,7 +10,7 @@ type MockedSentinel struct {
 	mock.Mock
 }
 
-func (ms *MockedSentinel) GetId() string {
+func (ms *MockedSentinel) Id() string {
 	args := ms.Called()
 	return args.String(0)
 }
@@ -21,22 +20,43 @@ func (ms *MockedSentinel) Run(stockProvider client.StockProvider) (string, error
 	return args.String(0), args.Error(1)
 }
 
-func (ms *MockedSentinel) Kill() error {
-	args := ms.Called()
-	return args.Error(1)
+func TestSentinelShouldReturnItsId(t *testing.T) {
+	setup(t)
+	dummyId := "some-dummyId"
+	sentinel := StockSentinel{id: dummyId}
+	assert.Equal(dummyId, sentinel.Id())
 }
 
 func TestNewSentinelShouldReturnASentinelWithAUniqueId(t *testing.T) {
 	var (
-		assert   = assert2.New(t)
 		schedule = NewSchedule("foo", "bar")
-		config   = SentinelConfig{}
-		ctx, _   = NewAppContext(&config)
 	)
 
-	firstSentinel, _ := NewStockSentinel(ctx, schedule)
-	secondSentinel, _ := NewStockSentinel(ctx, schedule)
+	setup(t)
+	contextMock.On("Logger").Return(dummyLogger).Times(2)
+	firstSentinel, _ := NewStockSentinel(contextMock, schedule)
+	secondSentinel, _ := NewStockSentinel(contextMock, schedule)
 	assert.NotNil(firstSentinel)
 	assert.NotNil(secondSentinel)
 	assert.NotEqual(firstSentinel.id, secondSentinel.id)
+}
+
+func TestSentinelsShouldStopProperlyWhenAErrorOccurWhileGettingStocks(t *testing.T) {
+	setup(t)
+	assert.True(false)
+}
+
+func TestSentinelsShouldStopProperlyWhenNoStocksWereFoundButNoErrorWereReturned(t *testing.T) {
+	setup(t)
+	assert.True(false)
+}
+
+func TestSentinelsShouldStopProperlyWhenItWasImpossibleToPublishStocks(t *testing.T) {
+	setup(t)
+	assert.True(false)
+}
+
+func TestSentinelsShouldReturnItsExecutionAndNoErrosWhenItHasRunSuccessfully(t *testing.T) {
+	setup(t)
+	assert.True(false)
 }

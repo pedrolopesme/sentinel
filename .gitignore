@@ -43,3 +43,6 @@ _vendor*
 sentinel
 logs/*.log
 config/*.env
+
+# VIM
+*.swp
