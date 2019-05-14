@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/pedrolopesme/sentinel/client"
 	assert2 "github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"testing"
@@ -8,10 +9,11 @@ import (
 
 var (
 	// Mocks
-	contextMock  *MockedContext
-	dockMock     *MockedDock
-	scheduleMock *MockedSchedule
-	sentinelMock *MockedSentinel
+	contextMock       *MockedContext
+	dockMock          *MockedDock
+	scheduleMock      *MockedSchedule
+	sentinelMock      *MockedSentinel
+	stockProviderMock *client.MockedStockProvider
 
 	// Dummy objects
 	dummyLogger *zap.Logger
@@ -26,4 +28,5 @@ func setup(t *testing.T) {
 
 	// Mocks
 	contextMock = &MockedContext{}
+	stockProviderMock = &client.MockedStockProvider{}
 }
