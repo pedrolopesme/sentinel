@@ -6,7 +6,6 @@ import (
 
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/pedrolopesme/sentinel/client"
-	"github.com/pedrolopesme/sentinel/models"
 	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
@@ -56,7 +55,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 		return "", err
 	}
 
-	if err := s.publishStocks(executionId, stockProvider, stocks); err != nil {
+	if err := s.publishStocks(executionId, stockProvider, *stocks); err != nil {
 		logger.Error("Cant publish stocks",
 			zap.String("sentinelId", s.Id()),
 			zap.String("executionId", executionId),
@@ -69,7 +68,7 @@ func (s *StockSentinel) Run(stockProvider client.StockProvider) (string, error) 
 }
 
 // TODO extract to its own structure. Is "Stocks Publisher" a good name?
-func (s *StockSentinel) publishStocks(executionId string, stockProvider client.StockProvider, stocks map[time.Time]models.StockTier) (err error) {
+func (s *StockSentinel) publishStocks(executionId string, stockProvider client.StockProvider, stocks client.StocksByTime) (err error) {
 	var (
 		logger          = s.ctx.Logger()
 		stockNATSClient = s.ctx.StockNats().GetConnection()

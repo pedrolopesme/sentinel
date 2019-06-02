@@ -1,9 +1,7 @@
 package client
 
 import (
-	"github.com/pedrolopesme/sentinel/models"
 	"github.com/stretchr/testify/mock"
-	"time"
 )
 
 type MockedStockProvider struct {
@@ -15,7 +13,7 @@ func (sp *MockedStockProvider) GetName() string {
 	return args.String(0)
 }
 
-func (sp *MockedStockProvider) GetStocks(stock string, timeFrame string) (map[time.Time]models.StockTier, error) {
+func (sp *MockedStockProvider) GetStocks(stock string, timeFrame string) (*StocksByTime, error) {
 	args := sp.Called()
-	return args.Get(0).(map[time.Time]models.StockTier), args.Error(1)
+	return args.Get(0).(*StocksByTime), args.Error(1)
 }

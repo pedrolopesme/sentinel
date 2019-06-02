@@ -31,13 +31,14 @@ func NewAlphaVantage(key string) *AlphaVantage {
 // GetStocks returns stocks price variation within a given time frame
 // TODO add some logging
 // TODO parse body to Stocktiers by Time
-func (a *AlphaVantage) GetStocks(stock string, timeFrame string) (map[time.Time]models.StockTier, error) {
+func (a *AlphaVantage) GetStocks(stock string, timeFrame string) (*StocksByTime, error) {
 	url := buildURL(stock, timeFrame, a.Key)
 	body, err := makeHttpCall(url)
 	if err != nil {
 		return nil, ErrCantGetStockPricesFromAlphaVantage
 	}
-	return parseStocksCSV(body)
+	stocks, err := parseStocksCSV(body)
+	return &stocks, err
 }
 
 // GetName returns stock provider name
@@ -82,7 +83,7 @@ func makeHttpCall(url string) ([]byte, error) {
 // TODO add tests
 // TODO add logs
 // TODO add util funcs for time, number manipulation
-func parseStocksCSV(body []byte) (map[time.Time]models.StockTier, error) {
+func parseStocksCSV(body []byte) (StocksByTime, error) {
 	const (
 		TIME_COLUMN = iota
 		OPEN_COLUMN

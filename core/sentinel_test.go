@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/pedrolopesme/sentinel/client"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"testing"
 )
@@ -42,8 +43,21 @@ func TestNewSentinelShouldReturnASentinelWithAUniqueId(t *testing.T) {
 }
 
 func TestSentinelsShouldStopProperlyWhenAErrorOccurWhileGettingStocks(t *testing.T) {
+	var (
+		schedule = NewSchedule("foo", "bar")
+		stocks   = make(client.StocksByTime)
+	)
+
 	setup(t)
-	assert.True(false)
+	contextMock.On("Logger").Return(dummyLogger).Times(2)
+	stockProviderMock.On("GetName").Return("boo").Once()
+	stockProviderMock.On("GetStocks", mock.AnythingOfType("string"), mock.AnythingOfType("string")).
+		Return(&stocks, errors.New("some error")).
+		Once()
+
+	sentinel, _ := NewStockSentinel(contextMock, schedule)
+	_, err := sentinel.Run(stockProviderMock)
+	assert.NotNil(err)
 }
 
 func TestSentinelsShouldStopProperlyWhenNoStocksWereFoundButNoErrorWereReturned(t *testing.T) {
