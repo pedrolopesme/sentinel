@@ -61,8 +61,26 @@ func TestSentinelsShouldStopProperlyWhenAErrorOccurWhileGettingStocks(t *testing
 }
 
 func TestSentinelsShouldStopProperlyWhenNoStocksWereFoundButNoErrorWereReturned(t *testing.T) {
+	var (
+		schedule = NewSchedule("foo", "bar")
+		stocks   = make(client.StocksByTime)
+	)
+
 	setup(t)
-	assert.True(false)
+
+	// TODO: my NatsServer should not expose Nat's internal connection. It should
+	// keep nats connection internally and expose the main funs (eg Publish/Consume).
+	natServerMock.On("GetConnection").Return(nil)
+	contextMock.On("Logger").Return(dummyLogger)
+	contextMock.On("StockNats").Return(natServerMock)
+	stockProviderMock.On("GetName").Return("boo").Once()
+	stockProviderMock.On("GetStocks", mock.AnythingOfType("string"), mock.AnythingOfType("string")).
+		Return(&stocks, nil).
+		Once()
+
+	sentinel, _ := NewStockSentinel(contextMock, schedule)
+	_, err := sentinel.Run(stockProviderMock)
+	assert.NotNil(err)
 }
 
 func TestSentinelsShouldStopProperlyWhenItWasImpossibleToPublishStocks(t *testing.T) {

@@ -13,6 +13,7 @@ var (
 	dockMock          *MockedDock
 	scheduleMock      *MockedSchedule
 	sentinelMock      *MockedSentinel
+	natServerMock     *client.MockedNATSServer
 	stockProviderMock *client.MockedStockProvider
 
 	// Dummy objects
@@ -29,4 +30,5 @@ func setup(t *testing.T) {
 	// Mocks
 	contextMock = &MockedContext{}
 	stockProviderMock = &client.MockedStockProvider{}
+	natServerMock = &client.MockedNATSServer{}
 }
